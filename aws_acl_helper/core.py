@@ -13,6 +13,7 @@ from . import aclmatch
 
 reader, writer = None, None
 
+
 @asyncio.coroutine
 def stdio(loop=None):
     if loop is None:
@@ -33,6 +34,9 @@ def stdio(loop=None):
 
 @asyncio.coroutine
 def async_input(loop=None):
+    if loop is None:
+        loop = asyncio.get_event_loop()
+
     global reader, writer
     if (reader, writer) == (None, None):
         reader, writer = yield from stdio()
@@ -40,22 +44,36 @@ def async_input(loop=None):
     while True:
         line = yield from reader.readline()
         if line == b'':
-            for task in asyncio.Task.all_tasks():
-                task.cancel()
+            yield from metadata.close()
             return
         
+        loop.create_task(handle_line(line, writer))
+
+
+@asyncio.coroutine
+def handle_line(line, writer):
+    request = None
+    result = 'BH'
+    pairs = {}
+    try:
         # Get a Request object with parsed fields
         request = squid.Request(line)
 
         # Get metadata from back-end
         hostinfo = yield from metadata.lookup(request)
 
-        # Use metadata to make access decision
-        response = yield from aclmatch.test(request, hostinfo)
+        # Use metadata to make access decision (OK or ERR)
+        result, pairs = yield from aclmatch.test(request, hostinfo)
+        
+    except Exception as e:
+        pairs = { 'log': 'Exception encountered handling request' }
+        if request is None:
+            request = squid.Request(b'- -')
+        
+    # Output response to Squid
+    writer.write(request.make_response(result, pairs))
+    yield from writer.drain()
 
-        # Output response to Squid
-        writer.write(str(response).encode())
-        yield from writer.drain()
 
 @click.command()
 def listen():

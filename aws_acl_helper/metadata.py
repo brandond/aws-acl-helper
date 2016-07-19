@@ -1,9 +1,9 @@
 import asyncio
 import aioredis
 import pickle
+import sys
 
 loop = asyncio.get_event_loop()
-pool = None
 
 @asyncio.coroutine
 def lookup(request):
@@ -12,19 +12,20 @@ def lookup(request):
     if request.client is None:
         return None;
 
-    if pool is None:
-        pool = yield from aioredis.create_pool(('localhost', 6379), minsize=1, maxsize=20)
+    instance_data = None
 
-    with (yield from pool) as redis:
-        instance_id = yield from redis.get('{0!s}^ip-to-id^{1!s}'.format(__name__, request.client))
+    redis = yield from aioredis.create_redis(('localhost', 6379))
+    instance_id = yield from redis.get('{0!s}^ip-to-id^{1!s}'.format(__name__, request.client))
 
-        if instance_id is not None:
-            instance_data = yield from redis.get('{0!s}^instance^{1!s}'.format(__name__, instance_id.decode()))
+    if instance_id is not None:
+        pickle_data = yield from redis.get('{0!s}^instance^{1!s}'.format(__name__, instance_id.decode()))
 
-            if instance_data is not None:
-                return pickle.loads(instance_data)
+        if pickle_data is not None:
+            instance_data = pickle.loads(pickle_data)
 
-        return None
+    redis.close()
+    yield from redis.wait_closed()
+    return instance_data
 
 
 @asyncio.coroutine
@@ -33,11 +34,10 @@ def store(instance_data):
     instance_id = instance_data['instance_id']
 
     for interface in instance_data['network_interfaces']:
-        yield from redis.set('{0!s}^ip-to-id^{1!s}'.format(__name__, interface['private_ip_address']), instance_id)
-        if 'ip_address' in interface:
-            yield from redis.set('{0!s}^ip-to-id^{1!s}'.format(__name__, interface['ip_address']), instance_id)
+        yield from redis.setex('{0!s}^ip-to-id^{1!s}'.format(__name__, interface['private_ip_address']), 1800.0, instance_id)
+        if 'public_ip' in interface:
+            yield from redis.setex('{0!s}^ip-to-id^{1!s}'.format(__name__, interface['public_ip']), 1800.0, instance_id)
 
-    yield from redis.set('{0!s}^instance^{1!s}'.format(__name__, instance_id), pickle.dumps(instance_data))
+    yield from redis.setex('{0!s}^instance^{1!s}'.format(__name__, instance_id), 1800.0, pickle.dumps(instance_data))
     redis.close()
     yield from redis.wait_closed()
-
