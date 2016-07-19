@@ -5,6 +5,8 @@ from . import squid
 
 @asyncio.coroutine
 def test(request, metadata):
+    """Return an ACL action (OK, ERR, or BH) by comparing ACL entries against host metadata"""
+
     if request.client is None:
         return 'BH', {'log': 'Failed to parse client IP address'}
     if metadata is None or 'instance_id' not in metadata:
@@ -17,6 +19,22 @@ def test(request, metadata):
 
 
 def check_acl_entry(entry, metadata):
+    """ Check an individual ACL entry against host metadata
+
+    Returns True if matched, else False
+
+    Supported ACL entry strings:
+        * Instance ID (i-xxx)
+        * Security Group ID (sg-xxx)
+        * Image AMI ID (ami-xxx)
+        * VPC ID (vpc-xxx)
+        * Subnet ID (subnet-xxx)
+        * Availability zone (az:us-west-2*)          - Matches shell-style globs
+        * Security Group Name (sg:my security group) - Matches shell-style globs
+        * Tag (tag:Name=Value)                       - Matches shell-style globs
+        * Existence as an EC2 instance (ec2)         - Matches if request is from a known EC2 instance
+    """
+
     if entry.startswith('i-'):
         return entry == metadata.get('instance_id')
 
@@ -60,7 +78,7 @@ def check_acl_entry(entry, metadata):
                 return True
         return False
 
-    elif entry == 'known':
+    elif entry == 'ec2':
         return True
 
     else:

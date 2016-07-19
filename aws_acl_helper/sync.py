@@ -3,9 +3,10 @@ import boto3
 import asyncio
 
 from . import metadata
+from . import config
 
 def camel_dict_to_snake_dict(camel_dict):
-
+    """Convert Boto3 CamelCase dict to snake_case dict"""
     def camel_to_snake(name):
 
         import re
@@ -44,6 +45,7 @@ def camel_dict_to_snake_dict(camel_dict):
 
 
 def tag_list_to_dict(tags_list):
+    """Convert Boto3-style key-value tags list into dict"""
     tags_dict = {}
 
     for tag in tags_list:
@@ -55,24 +57,46 @@ def tag_list_to_dict(tags_list):
     return tags_dict
 
 
-def store_all_metadata():
+def store_aws_metadata(config):
+    """Store AWS metadata (result of ec2.describe_instances call) into Redis"""
     loop = asyncio.get_event_loop()
     client = boto3.client('ec2')
     response = client.describe_instances()
     tasks = []
 
+    # Find all instances, convert to snake dict, convert to tags, and fire off
+    # task to store in Redis
     for reservation in response.get('Reservations', []):
         for instance in reservation.get('Instances', []):
             instance = camel_dict_to_snake_dict(instance)
             instance['tags'] = tag_list_to_dict(instance.get('tags', []))
             print('Storing data for {instance_id}'.format(**instance))
-            tasks.append(loop.create_task(metadata.store(instance)))
+            tasks.append(loop.create_task(metadata.store(config,instance)))
     
     loop.run_until_complete(asyncio.wait(tasks))
     loop.stop()
 
-@click.command()
-def sync():
-    store_all_metadata()
 
+@click.option(
+    '--ttl', 
+    default=1800,
+    type=int, 
+    help='Time-to-live for AWS metadata stored in Redis.')
+@click.option(
+    '--port',
+    default=6379,
+    type=int,
+    help='Redis server port.'
+)
+@click.option(
+    '--host',
+    default='localhost',
+    type=str,
+    help='Redis server hostname.'
+)
+@click.command()
+def sync(host, port, ttl):
+    """Collect inventory from EC2 and persist to Redis"""
+    redis_config = config.Config(host=host, port=port, ttl=ttl)
+    store_aws_metadata(redis_config)
 
