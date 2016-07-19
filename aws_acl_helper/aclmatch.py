@@ -60,5 +60,8 @@ def check_acl_entry(entry, metadata):
                 return True
         return False
 
+    elif entry == 'known':
+        return True
+
     else:
         return False

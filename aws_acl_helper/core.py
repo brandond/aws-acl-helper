@@ -44,7 +44,6 @@ def async_input(loop=None):
     while True:
         line = yield from reader.readline()
         if line == b'':
-            yield from metadata.close()
             return
         
         loop.create_task(handle_line(line, writer))
@@ -66,7 +65,7 @@ def handle_line(line, writer):
         result, pairs = yield from aclmatch.test(request, hostinfo)
         
     except Exception as e:
-        pairs = { 'log': 'Exception encountered handling request' }
+        pairs = { 'log': 'Exception encountered handling request: '+str(e) }
         if request is None:
             request = squid.Request(b'- -')
         

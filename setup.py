@@ -3,7 +3,7 @@
 from setuptools import setup, find_packages
 
 
-with open('README.rst') as f:
+with open('README.md') as f:
     readme = f.read()
 
 with open('LICENSE') as f:
@@ -15,13 +15,13 @@ with open("aws_acl_helper/version.py") as fp:
 
 setup(
     name='aws-acl-helper',
-    version=version,
+    version=version['__version__'],
     description='Squid external ACL helper that allows use of AWS instance metadata',
     long_description=readme,
     author='Brandon Davidson',
     author_email='brad@oatmail.org',
     url='https://github.com/brandond/aws-acl-helper',
-    download_url='https://github.com/brandond/aws-acl-helper/tarball/{}'.format(version)
+    download_url='https://github.com/brandond/aws-acl-helper/tarball/{}'.format(version),
     license=license,
     packages=find_packages(exclude=('tests', 'docs')),
     entry_points={
