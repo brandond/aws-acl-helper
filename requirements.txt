@@ -1,5 +1,3 @@
-nose
-sphinx
 boto3
 asyncio
 aioredis
