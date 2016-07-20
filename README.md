@@ -1,37 +1,45 @@
 AWS ACL Helper
 ==============
-This module implements the Squid External ACL Helper interface, and allows for use of EC2 instance metadata
-in ACL entries. It uses the client's source address (either public or private) as a key to determine which
-instance initiated a request through the proxy, and allows use of instance metadata (such as Instance ID, VPC, 
-or Security Group membership) as a rule target.
+This module implements the Squid External ACL Helper interface, and allows for
+use of EC2 instance metadata in ACL entries. It uses the client's source
+address (either public or private) as a key to determine which instance 
+initiated a request through the proxy, and allows use of instance metadata
+(such as Instance ID, VPC, or Security Group membership) as a rule target.
 
-This module requires Python 3.4 or better, due to its use of the `asyncio` framework (`aioredis`, etc)
+This module requires Python 3.4 or better, due to its use of the `asyncio`
+framework (`aioredis`, etc)
 
 Prerequisites
 -------------
-This module requires a Redis server to cache AWS instance metadata. Redis clusters are not currently supported.
+This module requires a Redis server to cache AWS instance metadata. Redis 
+clusters are not currently supported.
 
-This module uses Boto3 to retrieve EC2 instance metadata from AWS. You should have a working AWS API
-environment (~/.aws/credentials, environment variables, or instance profile) that allows calling EC2's
-`describe-instances` method against the account that Squid is running in.
+This module uses Boto3 to retrieve EC2 instance metadata from AWS. You should 
+have a working AWS API environment (~/.aws/credentials, environment variables,
+or EC2 IAM Role) that allows calling EC2's `describe-instances` method
+against the account that Squid is running in. If using EC2 IAM Roles, you 
+should use the `--region` option or `AWS_DEFAULT_REGION` environment variable
+to specify a region.
 
 Usage
 -----
 
 1. **Retrieve EC2 instance metadata from AWS and store in Redis:**
 
-   `aws-acl-helper sync`
+   `aws-acl-helper sync --region us-west-2`
 
     By default, metadata expires from Redis after 30 minutes. This is intended
-    to ensure that ACLs are not applied to the wrong hosts. Adjust the TTL up or down
-    depending on the volatility of your environment.
+    to ensure that ACLs are not applied to the wrong hosts. Adjust the TTL up
+    or down depending on the volatility of your environment.
 
-    **Note**: You should probably schedule this at regular intervals, (with a cronjob, etc)
-    as ACLs will not match hosts that exist in EC2 but have not yet been sync'd into Redis.
+    **Note**: You should probably schedule this at regular intervals, (with a
+    cronjob, etc) as ACLs will not match hosts that exist in EC2 but have not
+    yet been sync'd into Redis.
 
 2. **Configure external ACL helper in Squid:**
 
-    In your Squid config, define the external ACL, and apply some rules that use it:
+    In your Squid config, define the external ACL, and apply some rules that
+    use it:
     ```
     # Define external ACL helper
     external_acl_type ec2 ttl=60 children-startup=1 children-idle=1 children-max=4 concurrency=1000 ipv4 >a /path/to/aws-acl-helper listen
