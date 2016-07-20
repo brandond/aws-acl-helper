@@ -5,19 +5,22 @@ in ACL entries. It uses the client's source address (either public or private) a
 instance initiated a request through the proxy, and allows use of instance metadata (such as Instance ID, VPC, 
 or Security Group membership) as a rule target.
 
+This module requires Python 3.4 or better, due to its use of the `asyncio` framework (`aioredis`, etc)
+
 Prerequisites
 -------------
 This module requires a Redis server to cache AWS instance metadata. Redis clusters are not currently supported.
 
 This module uses Boto3 to retrieve EC2 instance metadata from AWS. You should have a working AWS API
 environment (~/.aws/credentials, environment variables, or instance profile) that allows calling EC2's
-```describe-instances``` method.
+`describe-instances` method against the account that Squid is running in.
 
 Usage
 -----
 
 1. **Retrieve EC2 instance metadata from AWS and store in Redis:**
-   ```aws-acl-helper sync```
+
+   `aws-acl-helper sync`
 
     By default, metadata expires from Redis after 30 minutes. This is intended
     to ensure that ACLs are not applied to the wrong hosts. Adjust the TTL up or down
@@ -50,11 +53,11 @@ Usage
 Supported ACL Entry Keys
 ------------------------
  * Instance ID (`i-xxx`)
-* Security Group ID `(sg-xxx`)
-* Image AMI ID (`ami-xxx`)
-* VPC ID (`vpc-xxx`)
-* Subnet ID (`subnet-xxx`)
-* Availability zone (`az:us-west-2*`)          **- Matches shell-style globs**
-* Security Group Name (`sg:my security group`) **- Matches shell-style globs**
-* Tag (`tag:Name=Value`)                       **- Matches shell-style globs**
-* Existence as an EC2 instance (`ec2`)         **- Matches if request is from a known EC2 instance**
+ * Security Group ID `(sg-xxx`)
+ * Image AMI ID (`ami-xxx`)
+ * VPC ID (`vpc-xxx`)
+ * Subnet ID (`subnet-xxx`)
+ * Availability zone (`az:us-west-2*`)          **- Matches shell-style globs**
+ * Security Group Name (`sg:my security group`) **- Matches shell-style globs**
+ * Tag (`tag:Name=Value`)                       **- Matches shell-style globs**
+ * Existence as an EC2 instance (`ec2`)         **- Matches if request is from a known EC2 instance**
