@@ -103,7 +103,7 @@ def store_aws_metadata(config):
 )
 @click.option(
     '--profile',
-    default='default',
+    default=None,
     type=str,
     help='AWS Configuration Profile name.'
 )
