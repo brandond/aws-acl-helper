@@ -1,7 +1,15 @@
 # -*- coding: utf-8 -*-
 
+import sys
 from setuptools import setup, find_packages
 
+if sys.version_info < (3, 4):
+    raise RuntimeError("aws-acl-helper doesn't support Python versions below 3.4")
+
+version = {}
+
+with open("aws_acl_helper/version.py") as fp:
+    exec(fp.read(), version)
 
 with open('README.md') as f:
     readme = f.read()
@@ -9,9 +17,8 @@ with open('README.md') as f:
 with open('LICENSE') as f:
     license = f.read()
 
-version = {}
-with open("aws_acl_helper/version.py") as fp:
-    exec(fp.read(), version)
+with open('requirements.txt') as f:
+    requirements = f.read().splitlines()
 
 setup(
     name='aws-acl-helper',
@@ -28,5 +35,6 @@ setup(
         'console_scripts': ['aws-acl-helper=aws_acl_helper.commands:cli']
     },
     include_package_data=True,
+    install_requires=requirements,
 )
 
