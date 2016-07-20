@@ -98,7 +98,7 @@ def handle_line(config, line):
     help='Redis server hostname.'
 )
 @click.command()
-def listen(host, port):
+def listen(**args):
     """Listen for ACL lookup request lines on stdin and write the responses on stdout"""
-    redis_config = config.Config(host=host, port=port)
-    asyncio.get_event_loop().run_until_complete(async_input(redis_config))
+    _config = config.Config(**args)
+    asyncio.get_event_loop().run_until_complete(async_input(_config))

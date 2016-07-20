@@ -60,7 +60,8 @@ def tag_list_to_dict(tags_list):
 def store_aws_metadata(config):
     """Store AWS metadata (result of ec2.describe_instances call) into Redis"""
     loop = asyncio.get_event_loop()
-    client = boto3.client('ec2')
+    session = boto3.Session(profile_name=config.profile_name, region_name=config.region_name)
+    client = session.client('ec2')
     response = client.describe_instances()
     tasks = []
 
@@ -72,10 +73,10 @@ def store_aws_metadata(config):
             instance['tags'] = tag_list_to_dict(instance.get('tags', []))
             print('Storing data for {instance_id}'.format(**instance))
             tasks.append(loop.create_task(metadata.store(config,instance)))
-    
-    loop.run_until_complete(asyncio.wait(tasks))
-    loop.stop()
 
+    if len(tasks) > 0: 
+        loop.run_until_complete(asyncio.wait(tasks))
+        loop.stop()
 
 @click.option(
     '--ttl', 
@@ -94,9 +95,21 @@ def store_aws_metadata(config):
     type=str,
     help='Redis server hostname.'
 )
+@click.option(
+    '--region',
+    default=None,
+    type=str,
+    help='AWS Region name (overrides region from profile).'
+)
+@click.option(
+    '--profile',
+    default='default',
+    type=str,
+    help='AWS Configuration Profile name.'
+)
 @click.command()
-def sync(host, port, ttl):
+def sync(**args):
     """Collect inventory from EC2 and persist to Redis"""
-    redis_config = config.Config(host=host, port=port, ttl=ttl)
-    store_aws_metadata(redis_config)
+    _config = config.Config(**args)
+    store_aws_metadata(_config)
 

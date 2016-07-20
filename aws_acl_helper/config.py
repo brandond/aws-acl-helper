@@ -4,14 +4,20 @@ class Config:
     _redis_host = 'localhost'
     _redis_port = 6379
     _redis_ttl = 1800
+    _profile_name = None
+    _region_name = None
 
-    def __init__(self, host=None, port=None, ttl=None):
+    def __init__(self, host=None, port=None, ttl=None, profile=None, region=None):
         if host is not None:
             self._redis_host = host
         if port is not None:
             self._redis_port = port
         if ttl is not None:
             self._redis_ttl = ttl
+        if profile is not None:
+            self._profile_name = profile
+        if region is not None:
+            self._region_name = region
 
     @property
     def redis_host(self):
@@ -28,3 +34,12 @@ class Config:
         """Expiration time for AWS metadata stored in Redis"""
         return self._redis_ttl
 
+    @property
+    def profile_name(self):
+        """AWS Configuration Profile name"""
+        return self._profile_name
+
+    @property
+    def region_name(self):
+        """AWS Region name"""
+        return self._region_name
