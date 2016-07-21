@@ -12,7 +12,7 @@ class Request:
 
     def __init__(self, line):
         """Parse a lookup request from Squid into its constituent parts"""
-        parts = line.decode().replace('\r', '').replace('\n', '').split(' ')
+        parts = line.decode().replace('\n', '').split(' ')
 
         # See if we're using concurrency; if so the first token is the integer channel ID
         try:
@@ -74,5 +74,5 @@ class Request:
             pair = ' '.join(['{}={}'.format(item[0], quote(item[1])) for item in keywords.items()])
 
         # Only include defined items in response line
-        line = ' '.join([p for p in [chan, result, pair] if p is not None])+'\r\n'
+        line = ' '.join([p for p in [chan, result, pair] if p is not None])+'\n'
         return line.encode()

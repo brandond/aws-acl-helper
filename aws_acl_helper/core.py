@@ -84,7 +84,11 @@ def handle_line(config, line):
             request = squid.Request(b'- -')
         
     # Output response to Squid
-    writer.write(request.make_response(result, pairs))
+    response = request.make_response(result, pairs)
+    if config.debug_enabled:
+        print('STDOUT: {}'.format(response), file=sys.stderr)
+
+    writer.write(response)
     yield from writer.drain()
 
 @click.option(
