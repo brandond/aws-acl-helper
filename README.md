@@ -9,7 +9,8 @@ initiated a request through the proxy, and allows use of instance metadata
 
 If the request can be mapped to an EC2 instance, the module will populate
 the EC2 Instance ID into the request's 'user' field, for consumption by
-additional ACLs or output to logs.
+additional ACLs or output to logs. This occurs regardless of whether or not
+the ACL matched.
 
 Prerequisites
 -------------
@@ -78,7 +79,7 @@ Usage
     http_access deny
     ```
     
-Supported ACL Entry Keys
+Supported ACL Parameters
 ------------------------
  * Instance ID (`i-xxx`)
  * Security Group ID `(sg-xxx`)
@@ -108,7 +109,7 @@ Caveats
     acl my_acl external ec2 sg-yyyyyyyy
     ```
 
-2. **Values Containing Spaces Must Be Quoted or Encoded**
+2. **Parameters Containing Spaces Must Be Quoted or Encoded**
 
    In order to reference security groups or tag values that contain spaces,
    the `configuration_includes_quoted_values` option must be toggled off prior
