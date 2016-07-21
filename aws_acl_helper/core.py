@@ -45,7 +45,7 @@ def async_input(config,):
     while True:
         line = yield from reader.readline()
         if config.debug_enabled:
-            print('STDIN: {}'.format(line), file=sys.stderr)
+            print('STDIN: {}'.format(line), file=sys.stderr, flush=True)
 
         # Readline returns empty bystes string when the socket is closed
         if line == b'':
@@ -84,7 +84,7 @@ def handle_line(config, line):
     # Output response to Squid
     response = request.make_response(result, pairs)
     if config.debug_enabled:
-        print('STDOUT: {}'.format(response), file=sys.stderr)
+        print('STDOUT: {}'.format(response), file=sys.stderr, flush=True)
 
     writer.write(response)
     yield from writer.drain()
