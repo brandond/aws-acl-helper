@@ -108,4 +108,6 @@ def handle_line(config, line):
 def listen(**args):
     """Listen for ACL lookup request lines on stdin and write the responses on stdout"""
     _config = config.Config(**args)
-    asyncio.get_event_loop().run_until_complete(async_input(_config))
+    loop = asyncio.get_event_loop()
+    loop.set_debug(_config.debug_enabled)
+    loop.run_until_complete(async_input(_config))
