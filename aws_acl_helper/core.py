@@ -25,9 +25,7 @@ def stdio(loop=None):
     reader = asyncio.StreamReader()
     reader_protocol = asyncio.StreamReaderProtocol(reader)
 
-    fdno = 0 if sys.stdin.isatty() else 1
-
-    writer_transport, writer_protocol = yield from loop.connect_write_pipe(FlowControlMixin, os.fdopen(fdno, 'wb'))
+    writer_transport, writer_protocol = yield from loop.connect_write_pipe(FlowControlMixin, os.fdopen(0, 'wb'))
     writer = StreamWriter(writer_transport, writer_protocol, None, loop)
 
     yield from loop.connect_read_pipe(lambda: reader_protocol, sys.stdin)
