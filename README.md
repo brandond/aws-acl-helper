@@ -42,11 +42,11 @@ Usage
     use it:
     ```
     # Define external ACL helper
-    external_acl_type ec2 ttl=60 children-startup=1 children-idle=1 children-max=4 concurrency=1000 ipv4 >a /path/to/aws-acl-helper listen
+    external_acl_type ec2 ttl=60 children-startup=1 children-idle=1 children-max=4 concurrency=1000 ipv4 %SRC /path/to/aws-acl-helper listen
     
     # Define an ACL that matches a security group and an instance
-    acl ec2_google_ok ec2 sg-xxxxxxxx
-    acl ec2_google_ok ec2 i-yyyyyyyy
+    acl ec2_google_ok external ec2 sg-xxxxxxxx
+    acl ec2_google_ok external ec2 i-yyyyyyyy
     
     # Define an ACL that allows requests to Google
     acl to_google dstdomain .google.com
