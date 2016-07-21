@@ -46,6 +46,8 @@ def async_input(config,):
 
     while True:
         line = yield from reader.readline()
+        if config.debug_enabled:
+            print('STDIN: {}'.format(line), file=sys.stderr)
 
         # Readline returns empty bystes string when the socket is closed
         if line == b'':
@@ -85,6 +87,11 @@ def handle_line(config, line):
     writer.write(request.make_response(result, pairs))
     yield from writer.drain()
 
+@click.option(
+    '--debug',
+    is_flag=True,
+    help="Enable debug logging to STDERR."
+)
 @click.option(
     '--port',
     default=6379,

@@ -6,8 +6,9 @@ class Config:
     _redis_ttl = 1800
     _profile_name = None
     _region_name = None
+    _debug = False
 
-    def __init__(self, host=None, port=None, ttl=None, profile=None, region=None):
+    def __init__(self, host=None, port=None, ttl=None, profile=None, region=None, debug=False):
         if host is not None:
             self._redis_host = host
         if port is not None:
@@ -18,6 +19,8 @@ class Config:
             self._profile_name = profile
         if region is not None:
             self._region_name = region
+        if debug is not False:
+            self._debug = True
 
     @property
     def redis_host(self):
@@ -43,3 +46,8 @@ class Config:
     def region_name(self):
         """AWS Region name"""
         return self._region_name
+
+    @property
+    def debug_enabled(self):
+        """Debug Flag Status"""
+        return self._debug
