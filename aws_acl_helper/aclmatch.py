@@ -32,7 +32,7 @@ def check_acl_entry(entry, metadata):
         * Availability zone (az:us-west-2*)          - Matches shell-style globs
         * Security Group Name (sg:my security group) - Matches shell-style globs
         * Tag (tag:Name=Value)                       - Matches shell-style globs
-        * Existence as an EC2 instance (ec2)         - Matches if request is from a known EC2 instance
+        * Existence as an EC2 instance (any)         - Matches if request is from a known EC2 instance
     """
 
     if entry.startswith('i-'):
@@ -78,7 +78,7 @@ def check_acl_entry(entry, metadata):
                 return True
         return False
 
-    elif entry == 'ec2':
+    elif entry == 'any':
         return True
 
     else:
