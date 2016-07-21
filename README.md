@@ -93,6 +93,7 @@ Supported ACL Entry Keys
 Caveats
 -------
 1. **ACL Definitions May Not Span Multiple Lines**
+
     Unlike built-in ACL types, external ACLs cannot span multiple lines.
     All parameters for a given ACL must be specified on a single line.
 
@@ -108,6 +109,7 @@ Caveats
     ```
 
 2. **Values Containing Spaces Must Be Quoted or Encoded**
+
    In order to reference security groups or tag values that contain spaces,
    the `configuration_includes_quoted_values` option must be toggled off prior
    to the quoted ACL definition. The option can be toggled back on afterwards.
