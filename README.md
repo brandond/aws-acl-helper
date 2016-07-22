@@ -125,3 +125,10 @@ Caveats
    ```
    acl my_acl external ec2 "/path/to/acl_parameters.txt"
    ```
+
+Use With Amazon Linux
+---------------------
+Setting up a Python 3.4 virtualenv in RedHat based distributions can be
+difficult, since they do some weird things with packaging pip and setuptools.
+A script to automate the build of a virtualenv containing this module is
+available at [docs/create-virtualenv.sh](docs/create-virtualenv.sh)

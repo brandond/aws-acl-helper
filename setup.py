@@ -30,7 +30,7 @@ setup(
     url='https://github.com/brandond/aws-acl-helper',
     download_url='https://github.com/brandond/aws-acl-helper/tarball/{}'.format(version),
     license=license,
-    packages=find_packages(),
+    packages=find_packages(exclude=('docs')),
     entry_points={
         'console_scripts': ['aws-acl-helper=aws_acl_helper.commands:cli']
     },

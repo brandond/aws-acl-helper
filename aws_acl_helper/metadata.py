@@ -80,6 +80,7 @@ def close():
                     yield from asyncio.sleep(1)
 
                 # Ask the connection pool to close any open connections, and wait for it to do so
-                pool.close()
-                yield from pool.wait_closed()
+                if callable(getattr(pool, 'close', None)):
+                    pool.close()
+                    yield from pool.wait_closed()
                 pool = None
