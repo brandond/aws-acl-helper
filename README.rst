@@ -35,9 +35,7 @@ Usage
 
 1. **Retrieve EC2 instance metadata from AWS and store in Redis:**
 
-``aws-acl-helper sync --region us-west-2``
-
-::
+   ``aws-acl-helper sync --region us-west-2``
 
     By default, metadata expires from Redis after 30 minutes. This is intended
     to ensure that ACLs are not applied to the wrong hosts. Adjust the TTL up
@@ -51,8 +49,6 @@ Usage
 
    In your Squid config, define the external ACL, and apply some rules
    that use it:
-
-   ::
 
        # Define external ACL helper
        external_acl_type ec2 ttl=60 children-startup=1 children-idle=1 children-max=4 concurrency=1000 ipv4 %SRC /path/to/aws-acl-helper listen
@@ -91,13 +87,10 @@ Supported ACL Parameters
 -  Image AMI ID (``ami-xxx``)
 -  VPC ID (``vpc-xxx``)
 -  Subnet ID (``subnet-xxx``)
--  Availability Zone (``az:us-west-2*``) **- Supports shell-style
-   globs**
--  Security Group Name (``sg:my security group``) **- Supports
-   shell-style globs**
+-  Availability Zone (``az:us-west-2*``) **- Supports shell-style globs**
+-  Security Group Name (``sg:my security group``) **- Supports shell-style globs**
 -  Tag (``tag:Name=Value``) **- Supports shell-style globs**
--  Metadata availability (``any``) **- Matches if request is from any
-   known EC2 instance**
+-  Metadata availability (``any``) **- Matches if request is from any known EC2 instance**
 
 Caveats
 -------
@@ -108,29 +101,29 @@ Caveats
    All parameters for a given ACL must be specified on a single line.
 
    Works:
-
-   ::
-
+   
        acl my_acl external ec2 sg-xxxxxxxx sg-yyyyyyyy
 
    Does Not Work:
-
-   ::
-
+   
        acl my_acl external ec2 sg-xxxxxxxx
        acl my_acl external ec2 sg-yyyyyyyy
 
 2. **Parameters Containing Spaces Must Be Quoted or Encoded**
 
-In order to reference security groups or tag values that contain spaces,
-the ``configuration_includes_quoted_values`` option must be toggled off
-prior to the quoted ACL definition. The option can be toggled back on
-afterwards.
-``configuration_includes_quoted_values on    acl my_acl external ec2 "sg:my security group name"    configuration_includes_quoted_values off``
+   In order to reference security groups or tag values that contain spaces,
+   the ``configuration_includes_quoted_values`` option must be toggled off
+   prior to the quoted ACL definition. The option can be toggled back on
+   afterwards.
 
-Alternately, you could place your ACL parameters in an external file,
-one per line, and use the quoted inclusion feature:
-``acl my_acl external ec2 "/path/to/acl_parameters.txt"``
+       configuration_includes_quoted_values on
+       acl my_acl external ec2 "sg:my security group name"
+       configuration_includes_quoted_values off
+
+   Alternately, you could place your ACL parameters in an external file,
+   one per line, and use the quoted inclusion feature:
+
+       acl my_acl external ec2 "/path/to/acl_parameters.txt"
 
 Use With Amazon Linux
 ---------------------
@@ -139,4 +132,4 @@ Setting up a Python 3.4 virtualenv in RedHat based distributions can be
 difficult, since they do some weird things with packaging pip and
 setuptools. A script to automate the build of a virtualenv containing
 this module is available at
-`docs/create-virtualenv.sh <docs/create-virtualenv.sh>`__
+`docs/create-virtualenv.sh <docs/create-virtualenv.sh>`
