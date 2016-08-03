@@ -37,13 +37,13 @@ Usage
 
    ``aws-acl-helper sync --region us-west-2``
 
-    By default, metadata expires from Redis after 30 minutes. This is intended
-    to ensure that ACLs are not applied to the wrong hosts. Adjust the TTL up
-    or down depending on the volatility of your environment.
+   By default, metadata expires from Redis after 30 minutes. This is intended
+   to ensure that ACLs are not applied to the wrong hosts. Adjust the TTL up
+   or down depending on the volatility of your environment.
 
-    **Note**: You should probably schedule this at regular intervals, (with a
-    cronjob, etc) as ACLs will not match hosts that exist in EC2 but have not
-    yet been sync'd into Redis.
+   **Note**: You should probably schedule this at regular intervals, (with a
+   cronjob, etc) as ACLs will not match hosts that exist in EC2 but have not
+   yet been sync'd into Redis.
 
 2. **Configure external ACL helper in Squid:**
 
