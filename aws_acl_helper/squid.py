@@ -74,5 +74,5 @@ class Request:
             pair = ' '.join(['{}={}'.format(item[0], quote(item[1])) for item in keywords.items()])
 
         # Only include defined items in response line
-        line = ' '.join([p for p in [chan, result, pair] if p is not None])+'\n\n'
+        line = ' '.join([p for p in [chan, result, pair] if p is not None])+'\n'
         return line.encode()
