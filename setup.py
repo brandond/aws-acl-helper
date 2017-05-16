@@ -28,7 +28,7 @@ setup(
     author='Brandon Davidson',
     author_email='brad@oatmail.org',
     url='https://github.com/brandond/aws-acl-helper',
-    download_url='https://github.com/brandond/aws-acl-helper/tarball/{}'.format(version),
+    download_url='https://github.com/brandond/aws-acl-helper/tarball/{}'.format(version['__version__']),
     license=license,
     packages=find_packages(exclude=('docs')),
     entry_points={
