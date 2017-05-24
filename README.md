@@ -33,8 +33,24 @@ Usage
 -----
 
 1. **Retrieve EC2 instance metadata from AWS and store in Redis:**
+ 
+    ```
+    Usage: aws-acl-helper sync [OPTIONS]
 
-   `aws-acl-helper sync --region us-west-2`
+      Collect inventory from EC2 and persist to Redis
+
+    Options:
+      --external-id TEXT  A unique identifier that is used by third parties when
+                          assuming roles in their customers' accounts.
+      --role-arn TEXT     The Amazon Resource Name (ARN) of the role to assume.
+      --profile TEXT      AWS Configuration Profile name.
+      --region TEXT       AWS Region name (overrides region from profile).
+      --host TEXT         Redis server hostname.
+      --port INTEGER      Redis server port.
+      --ttl INTEGER       Time-to-live for AWS metadata stored in Redis.
+      --help              Show this message and exit.
+    ```
+
 
     By default, metadata expires from Redis after 30 minutes. This is intended
     to ensure that ACLs are not applied to the wrong hosts. Adjust the TTL up
@@ -86,6 +102,7 @@ Supported ACL Parameters
  * Image AMI ID (`ami-xxx`)
  * VPC ID (`vpc-xxx`)
  * Subnet ID (`subnet-xxx`)
+ * Owner ID (`owner:012345678901`)              **- Interface's AWS Account ID**
  * Availability Zone (`az:us-west-2*`)          **- Supports shell-style globs**
  * Security Group Name (`sg:my security group`) **- Supports shell-style globs**
  * Tag (`tag:Name=Value`)                       **- Supports shell-style globs**

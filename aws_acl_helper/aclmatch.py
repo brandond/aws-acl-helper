@@ -57,6 +57,13 @@ def check_acl_entry(entry, metadata):
                 return True
         return False
 
+    elif entry.startswith('owner:'):
+        owner_id = entry[6:].lower()
+        for interface in metadata.get('network_interfaces', []):
+            if owner_id == interface.get('owner_id'):
+                return True
+        return False
+
     elif entry.startswith('az:'):
         pattern = entry[3:].lower()
         return fnmatch.fnmatch(metadata.get('placement', {}).get('availability_zone', '').lower(), pattern)

@@ -67,6 +67,7 @@ def store(config, instance_data):
     redis.close()
     yield from redis.wait_closed()
 
+
 @asyncio.coroutine
 def close():
     global pool

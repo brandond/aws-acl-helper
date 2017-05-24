@@ -1,6 +1,9 @@
 import click
 import boto3
+import botocore
 import asyncio
+import json
+import time
 
 from . import metadata
 from . import config
@@ -57,20 +60,48 @@ def tag_list_to_dict(tags_list):
     return tags_dict
 
 
-def store_aws_metadata(config):
-    """Store AWS metadata (result of ec2.describe_instances call) into Redis"""
-    loop = asyncio.get_event_loop()
+def get_instance_region():
+    data = {}
+    fetcher = botocore.InstanceMetadataFetcher()
+
+    try:
+        r = fetcher._get_request('http://169.254.169.254/latest/dynamic/instance-identity/document', fetcher._timeout, fetcher._num_attempts)
+        if r.content:
+            val = r.content.decode('utf-8')
+            if val[0] == '{':
+                data = json.loads(val)
+    except botocore._RetriesExceededError:
+        print("Max number of attempts exceeded ({0}) when attempting to retrieve data from metadata service.".format(num_attempts))
+
+    return data.get('region', None)
+
+
+def create_session(config):
     session_config = dict(profile_name=config.profile_name, region_name=config.region_name)
     session = boto3.Session(**session_config)
 
+    # IAM Role credentials don't provide a default region (unlike Lambda and Profiles)
+    if session.get_credentials().method == 'iam-role' and not session.region_name:
+        session_config['region_name'] = get_instance_region()
+        session = boto3.Session(**session_config)
+
     if config.role_arn:
         sts_client = session.client('sts')
-        assumed_role = sts_client.assume_role(RoleArn=config.role_arn, ExternalId=config.external_id, RoleSessionName=__name__)
+        role_session_name = 'squid.aws-acl-helper.session-{0}'.format(time.time())
+
+        assumed_role = sts_client.assume_role(RoleArn=config.role_arn, ExternalId=config.external_id, RoleSessionName=role_session_name)
         session_config['aws_access_key_id'] = assumed_role['Credentials']['AccessKeyId']
         session_config['aws_secret_access_key'] = assumed_role['Credentials']['SecretAccessKey']
         session_config['aws_session_token'] = assumed_role['Credentials']['SessionToken']
         session = boto3.Session(**session_config)
 
+    return session
+
+
+def store_aws_metadata(config):
+    """Store AWS metadata (result of ec2.describe_instances call) into Redis"""
+    loop = asyncio.get_event_loop()
+    session = create_session(config)
     ec2_client = session.client('ec2')
     response = ec2_client.describe_instances()
     tasks = []

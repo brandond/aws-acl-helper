@@ -27,7 +27,6 @@ This module uses Boto3 to retrieve EC2 instance metadata from AWS. You
 should have a working AWS API environment (~/.aws/credentials,
 environment variables, or EC2 IAM Role) that allows calling EC2's
 ``describe-instances`` method against the account that Squid is running
-in. If using EC2 IAM Roles, you should use the ``--region`` option or
-``AWS_DEFAULT_REGION`` environment variable to specify a region.
+in. 
 
 Consult `README.md on GitHub <https://github.com/brandond/aws-acl-helper/blob/master/README.md>`__ for usage instructions.
