@@ -60,9 +60,19 @@ def tag_list_to_dict(tags_list):
 def store_aws_metadata(config):
     """Store AWS metadata (result of ec2.describe_instances call) into Redis"""
     loop = asyncio.get_event_loop()
-    session = boto3.Session(profile_name=config.profile_name, region_name=config.region_name)
-    client = session.client('ec2')
-    response = client.describe_instances()
+    session_config = dict(profile_name=config.profile_name, region_name=config.region_name)
+    session = boto3.Session(**session_config)
+
+    if config.role_arn:
+        sts_client = session.client('sts')
+        assumed_role = sts_client.assume_role(RoleArn=config.role_arn, ExternalId=config.external_id, RoleSessionName=__name__)
+        session_config['aws_access_key_id'] = assumed_role['Credentials']['AccessKeyId']
+        session_config['aws_secret_access_key'] = assumed_role['Credentials']['SecretAccessKey']
+        session_config['aws_session_token'] = assumed_role['Credentials']['SessionToken']
+        session = boto3.Session(**session_config)
+
+    ec2_client = session.client('ec2')
+    response = ec2_client.describe_instances()
     tasks = []
 
     # Find all instances, convert to snake dict, convert to tags, and fire off
@@ -106,6 +116,18 @@ def store_aws_metadata(config):
     default=None,
     type=str,
     help='AWS Configuration Profile name.'
+)
+@click.option(
+    '--role-arn',
+    default=None,
+    type=str,
+    help='The Amazon Resource Name (ARN) of the role to assume.'
+)
+@click.option(
+    '--external-id',
+    default=None,
+    type=str,
+    help='A unique identifier that is used by third parties when assuming roles in their customers\' accounts.'
 )
 @click.command()
 def sync(**args):
