@@ -1,9 +1,10 @@
 import asyncio
-import aioredis
 import pickle
 import sys
 
-pool = None;
+import aioredis
+
+pool = None
 lock = asyncio.Lock()
 
 # Redis key prefixes
@@ -19,6 +20,7 @@ if instance then
   return redis.call('get', ARGV[3]..instance)
 end
 """
+
 
 @asyncio.coroutine
 def lookup(config, request):
@@ -37,7 +39,7 @@ def lookup(config, request):
                 pool = yield from aioredis.create_pool((config.redis_host, config.redis_port), minsize=2, maxsize=20)
 
     # Call the eval script to lookup IP and retrieve instance data.
-    # Could probably optimize this by storing the script server-side 
+    # Could probably optimize this by storing the script server-side
     # during initial pool creation.
     with (yield from pool) as redis:
         pickle_data = yield from redis.eval(KEY_SCRIPT, args=[KEY_IP, str(request.client), KEY_ID])
@@ -52,7 +54,7 @@ def store(config, instance_data):
     redis = yield from aioredis.create_redis((config.redis_host, config.redis_port))
     pipe = redis.pipeline()
     instance_id = instance_data['instance_id']
-    
+
     # Store pickled data keyed off instance ID
     pipe.setex(KEY_ID + instance_id, float(config.redis_ttl), pickle.dumps(instance_data))
 

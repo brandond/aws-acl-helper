@@ -25,32 +25,18 @@ recommended.
 This module uses Boto3 to retrieve EC2 instance metadata from AWS. You should 
 have a working AWS API environment (~/.aws/credentials, environment variables,
 or EC2 IAM Role) that allows calling EC2's `describe-instances` method
-against the account that Squid is running in. If using EC2 IAM Roles, you 
-should use the `--region` option or `AWS_DEFAULT_REGION` environment variable
-to specify a region.
+against the account that Squid is running in.
 
-Usage
------
+Getting Started
+---------------
 
-1. **Retrieve EC2 instance metadata from AWS and store in Redis:**
+1. **Install aws-acl-helper:**
+
+   `pip install aws-acl-helper`
+
+2. **Retrieve EC2 instance metadata from AWS and store in Redis:**
  
-    ```
-    Usage: aws-acl-helper sync [OPTIONS]
-
-      Collect inventory from EC2 and persist to Redis
-
-    Options:
-      --external-id TEXT  A unique identifier that is used by third parties when
-                          assuming roles in their customers' accounts.
-      --role-arn TEXT     The Amazon Resource Name (ARN) of the role to assume.
-      --profile TEXT      AWS Configuration Profile name.
-      --region TEXT       AWS Region name (overrides region from profile).
-      --host TEXT         Redis server hostname.
-      --port INTEGER      Redis server port.
-      --ttl INTEGER       Time-to-live for AWS metadata stored in Redis.
-      --help              Show this message and exit.
-    ```
-
+    `aws-acl-helper sync --region us-west-2`
 
     By default, metadata expires from Redis after 30 minutes. This is intended
     to ensure that ACLs are not applied to the wrong hosts. Adjust the TTL up
@@ -60,7 +46,7 @@ Usage
     cronjob, etc) as ACLs will not match hosts that exist in EC2 but have not
     yet been sync'd into Redis.
 
-2. **Configure external ACL helper in Squid:**
+3. **Configure external ACL helper in Squid:**
 
     In your Squid config, define the external ACL, and apply some rules that
     use it:
@@ -94,19 +80,89 @@ Usage
     # Deny everything else
     http_access deny
     ```
-    
+
 Supported ACL Parameters
 ------------------------
+
  * Instance ID (`i-xxx`)
  * Security Group ID `(sg-xxx`)
  * Image AMI ID (`ami-xxx`)
  * VPC ID (`vpc-xxx`)
  * Subnet ID (`subnet-xxx`)
- * Owner ID (`owner:012345678901`)              **- Interface's AWS Account ID**
+ * Owner ID (`owner:012345678901`)              **- 12-digit AWS Account ID**
  * Availability Zone (`az:us-west-2*`)          **- Supports shell-style globs**
  * Security Group Name (`sg:my security group`) **- Supports shell-style globs**
  * Tag (`tag:Name=Value`)                       **- Supports shell-style globs**
  * Metadata availability (`any`)                **- Matches if request is from any known EC2 instance**
+
+Usage
+-----
+
+Run against a single account with options specified on the command line:
+
+```
+Usage: aws-acl-helper sync [OPTIONS]
+
+Options:
+  --profile TEXT      AWS Configuration Profile name.
+  --region TEXT       AWS Region name (overrides region from profile).
+  --role-arn TEXT     The Amazon Resource Name (ARN) of the role to assume.
+  --external-id TEXT  A unique identifier that is used by third parties when
+                      assuming roles in their customers' accounts.
+  --host TEXT         Redis server hostname.
+  --port INTEGER      Redis server port.
+  --ttl INTEGER       Time-to-live for AWS metadata stored in Redis.
+  --help              Show this message and exit.
+```
+
+Run against one or more accounts using a config file:
+
+```
+Usage: aws-acl-helper sync-multi [OPTIONS]
+
+Options:
+  --config PATH  Path to configuration file describing accounts and regions to
+                 sync.  [required]
+  --help         Show this message and exit.
+```
+
+Configuration File Syntax
+-------------------------
+
+The configuration file used by the `sync-multi` command should be in standard ConfigParser INI format.
+Specify one section per account; other than the DEFAULT section; section names are not important.
+Options are the same as those available to the `sync` command:
+
+| Key         | Type    | Description |
+| -           | -       | - |
+| profile     | TEXT    | AWS Configuration Profile name. |
+| region      | TEXT    | AWS Region name (overrides region from profile or environment). |
+| role_arn    | TEXT    | The Amazon Resource Name (ARN) of the role to assume. |
+| external_id | TEXT    | A unique identifier that is used by third parties when assuming roles in their customers' accounts. |
+| host        | TEXT    | Redis server hostname. |
+| port        | INTEGER | Redis server port. |
+| ttl         | INTEGER | Time-to-live for AWS metadata stored in Redis. |
+
+Sample Configuration File:
+
+```
+[DEFAULT]
+host = localhost
+port = 6379
+ttl = 1800
+
+[management]
+# no configuration necessary; use IAM Role Credentials for current account
+
+[development]
+role_arn = arn:aws:iam::111111111111:role/dev-acl-helper-role
+external_id = 123
+
+[uat]
+role_arn = arn:aws:iam::222222222222:role/uat-acl-helper-role
+external_id = 456
+
+```
 
 Caveats
 -------
@@ -128,9 +184,10 @@ Caveats
 
 2. **Parameters Containing Spaces Must Be Quoted or Encoded**
 
-   In order to reference security groups or tag values that contain spaces,
-   the `configuration_includes_quoted_values` option must be toggled off prior
-   to the quoted ACL definition. The option can be toggled back on afterwards.
+   In order to reference security groups or tag values that contain spaces, the
+   [configuration_includes_quoted_values](http://www.squid-cache.org/Doc/config/configuration_includes_quoted_values/)
+   option must be toggled on prior to the quoted ACL definition. The option can
+   be toggled back off afterwards.
    ```
    configuration_includes_quoted_values on
    acl my_acl external ec2 "sg:my security group name"
@@ -148,4 +205,6 @@ Use With Amazon Linux
 Setting up a Python 3.4 virtualenv in RedHat based distributions can be
 difficult, since they do some weird things with packaging pip and setuptools.
 A script to automate the build of a virtualenv containing this module is
-available at [docs/create-virtualenv.sh](docs/create-virtualenv.sh)
+available at [docs/create-virtualenv.sh](docs/create-virtualenv.sh).
+
+These issues seem to be resolved with Python 3.5, which I recommend using if at all possible.

@@ -2,3 +2,4 @@ click
 boto3
 asyncio
 aioredis >= 0.2.8
+configparser >= 3.5.0

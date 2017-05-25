@@ -1,3 +1,11 @@
+from backports import configparser
+
+
+def parse_file(filename):
+    config = configparser.ConfigParser()
+    config.read(filename)
+    return [Config(**config[s]) for s in config.sections()]
+
 
 class Config:
     """Configuration object to store command-line options or defaults"""

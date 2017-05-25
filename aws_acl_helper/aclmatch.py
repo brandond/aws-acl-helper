@@ -1,5 +1,6 @@
 import asyncio
 import fnmatch
+
 from . import squid
 
 
@@ -14,7 +15,7 @@ def test(request, metadata):
     else:
         for entry in request.acl:
             if check_acl_entry(entry, metadata):
-                return 'OK', {'user': metadata['instance_id']} 
+                return 'OK', {'user': metadata['instance_id']}
         return 'ERR', {'user': metadata['instance_id']}
 
 
