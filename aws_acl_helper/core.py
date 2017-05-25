@@ -1,17 +1,14 @@
 # -*- coding: utf-8 -*-
 
-import os
-import sys
-import click
 import asyncio
 import concurrent.futures
+import os
+import sys
+from asyncio.streams import FlowControlMixin, StreamWriter
 
-from asyncio.streams import StreamWriter, FlowControlMixin
+import click
 
-from . import squid
-from . import metadata
-from . import aclmatch
-from . import config
+from . import aclmatch, config, metadata, squid
 
 reader, writer = None, None
 
@@ -51,7 +48,7 @@ def async_input(config,):
         if line == b'':
             yield from metadata.close()
             return
-        
+
         # Process line in background task
         loop.create_task(handle_line(config, line))
 
@@ -73,14 +70,14 @@ def handle_line(config, line):
 
         # Use metadata to make access decision (OK, ERR, or BH)
         result, pairs = yield from aclmatch.test(request, hostinfo)
-        
+
     except Exception as e:
-        pairs = { 'log': 'Exception encountered handling request: '+str(e) }
+        pairs = {'log': 'Exception encountered handling request: '+str(e)}
         # Only discard the request if we failed to parse the input from Squid - ensures
         # that errors are reported properly when using concurrency.
         if request is None:
             request = squid.Request(b'- -')
-        
+
     # Output response to Squid
     response = request.make_response(result, pairs)
     if config.debug_enabled:
@@ -88,6 +85,7 @@ def handle_line(config, line):
 
     writer.write(response)
     yield from writer.drain()
+
 
 @click.option(
     '--debug',
@@ -106,9 +104,8 @@ def handle_line(config, line):
     type=str,
     help='Redis server hostname.'
 )
-@click.command()
+@click.command(short_help='Handle ACL lookup requests from Squid.')
 def listen(**args):
-    """Listen for ACL lookup request lines on stdin and write the responses on stdout"""
     _config = config.Config(**args)
     loop = asyncio.get_event_loop()
     loop.set_debug(_config.debug_enabled)

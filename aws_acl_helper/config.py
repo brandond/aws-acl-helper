@@ -1,3 +1,11 @@
+from backports import configparser
+
+
+def parse_file(filename):
+    config = configparser.ConfigParser()
+    config.read(filename)
+    return [Config(**config[s]) for s in config.sections()]
+
 
 class Config:
     """Configuration object to store command-line options or defaults"""
@@ -6,9 +14,11 @@ class Config:
     _redis_ttl = 1800
     _profile_name = None
     _region_name = None
+    _role_arn = None
+    _external_id = None
     _debug = False
 
-    def __init__(self, host=None, port=None, ttl=None, profile=None, region=None, debug=False):
+    def __init__(self, host=None, port=None, ttl=None, profile=None, region=None, role_arn=None, external_id=None, debug=False):
         if host is not None:
             self._redis_host = host
         if port is not None:
@@ -19,6 +29,10 @@ class Config:
             self._profile_name = profile
         if region is not None:
             self._region_name = region
+        if role_arn is not None:
+            self._role_arn = role_arn
+        if external_id is not None:
+            self._external_id = external_id
         if debug is not False:
             self._debug = True
 
@@ -46,6 +60,16 @@ class Config:
     def region_name(self):
         """AWS Region name"""
         return self._region_name
+
+    @property
+    def role_arn(self):
+        """Role ARN for AssumeRole call"""
+        return self._role_arn
+
+    @property
+    def external_id(self):
+        """External ID for AssumeRole call"""
+        return self._external_id
 
     @property
     def debug_enabled(self):

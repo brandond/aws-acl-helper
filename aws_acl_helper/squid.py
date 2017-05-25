@@ -4,6 +4,7 @@ from urllib.parse import quote, unquote
 # Valid response keywords
 _squid_keywords = frozenset(['clt_conn_tag', 'group', 'log', 'message', 'password', 'tag', 'ttl', 'user'])
 
+
 class Request:
     """Container object for Squid ACL lookup request"""
     _channel = -1
@@ -57,7 +58,7 @@ class Request:
         keywords = {}
 
         # Check for valid keywords; underscore suffix is reserved for admin use
-        # reference: http://wiki.squid-cache.org/Features/AddonHelpers#Access_Control_.28ACL.29 
+        # reference: http://wiki.squid-cache.org/Features/AddonHelpers#Access_Control_.28ACL.29
         for key, value in pairs.items():
             if key[-1] == '_' or key in _squid_keywords:
                 keywords[key] = value
@@ -68,7 +69,7 @@ class Request:
         # Include channe if it was specified in the request
         if self._channel != -1:
             chan = str(self._channel)
-        
+
         # Join together valid keywords
         if len(keywords) > 0:
             pair = ' '.join(['{}={}'.format(item[0], quote(item[1])) for item in keywords.items()])
