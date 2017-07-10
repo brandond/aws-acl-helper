@@ -72,7 +72,7 @@ def get_instance_region():
             if val[0] == '{':
                 data = json.loads(val)
     except botocore.utils._RetriesExceededError:
-        print("Max number of attempts exceeded ({0}) when attempting to retrieve data from metadata service.".format(num_attempts))
+        print("Max number of attempts exceeded ({0}) when attempting to retrieve data from metadata service.".format(fetcher._num_attempts))
 
     return data.get('region', None)
 
