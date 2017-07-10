@@ -63,7 +63,7 @@ def tag_list_to_dict(tags_list):
 
 def get_instance_region():
     data = {}
-    fetcher = botocore.InstanceMetadataFetcher()
+    fetcher = botocore.utils.InstanceMetadataFetcher()
 
     try:
         r = fetcher._get_request('http://169.254.169.254/latest/dynamic/instance-identity/document', fetcher._timeout, fetcher._num_attempts)
@@ -71,7 +71,7 @@ def get_instance_region():
             val = r.content.decode('utf-8')
             if val[0] == '{':
                 data = json.loads(val)
-    except botocore._RetriesExceededError:
+    except botocore.utils._RetriesExceededError:
         print("Max number of attempts exceeded ({0}) when attempting to retrieve data from metadata service.".format(num_attempts))
 
     return data.get('region', None)
