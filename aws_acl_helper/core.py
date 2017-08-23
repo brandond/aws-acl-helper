@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
-import concurrent.futures
 import os
 import sys
 from asyncio.streams import FlowControlMixin, StreamWriter

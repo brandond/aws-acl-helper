@@ -114,17 +114,30 @@ def store_aws_metadata(config):
     for region in regions:
         print('Describing instances in {0}'.format(region))
         ec2_client = session.client('ec2', region)
-        response = ec2_client.describe_instances()
         tasks = []
 
         # Find all instances, convert to snake dict, convert to tags, and fire off
         # task to store in Redis
-        for reservation in response.get('Reservations', []):
-            for instance in reservation.get('Instances', []):
-                instance = camel_dict_to_snake_dict(instance)
-                instance['tags'] = tag_list_to_dict(instance.get('tags', []))
-                print('Storing data for {instance_id}'.format(**instance))
-                tasks.append(loop.create_task(metadata.store(config, instance)))
+        try:
+            instances = ec2_client.describe_instances()
+            for reservation in instances.get('Reservations', []):
+                for instance in reservation.get('Instances', []):
+                    instance = camel_dict_to_snake_dict(instance)
+                    instance['tags'] = tag_list_to_dict(instance.get('tags', []))
+                    print('Storing data for {instance_id}'.format(**instance))
+                    tasks.append(loop.create_task(metadata.store_instance(config, instance)))
+        except Exception as e:
+            print('Failed to store instance information: {0}'.format(e))
+
+        try:
+            interfaces = ec2_client.describe_network_interfaces()
+            for interface in interfaces.get('NetworkInterfaces', []):
+                interface = camel_dict_to_snake_dict(interface)
+                interface['tags'] = tag_list_to_dict(interface.pop('tag_set', []))
+                print('Storing data for {network_interface_id}'.format(**interface))
+                tasks.append(loop.create_task(metadata.store_interface(config, interface)))
+        except Exception as e:
+            print('Failed to store interface information: {0}'.format(e))
 
     if len(tasks) > 0:
         loop.run_until_complete(asyncio.wait(tasks))

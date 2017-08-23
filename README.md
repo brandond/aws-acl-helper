@@ -22,10 +22,14 @@ This module requires a Redis server to cache AWS instance metadata. Redis
 clusters are not currently supported; use of a local Redis instance is
 recommended.
 
-This module uses Boto3 to retrieve EC2 instance metadata from AWS. You should 
+This module uses Boto3 to retrieve EC2 instance and interface metadata from AWS. You should 
 have a working AWS API environment (~/.aws/credentials, environment variables,
-or EC2 IAM Role) that allows calling EC2's `describe-instances` method
-against the account that Squid is running in.
+or EC2 IAM Role) that allows calling `ec2:DescribeInstances` and `ec2:DescribeNetworkInterfaces`
+against any accounts that the helper is configured to retrieve information from.
+
+If using cross-account role access to retrieve information, ensure that the credentials or role
+that the helper is using has permission to make `sts:AssumeRole` calls to access the other accounts,
+and that those roles in turn have permission to make the EC2 calls listed above.
 
 Getting Started
 ---------------
@@ -85,6 +89,7 @@ Supported ACL Parameters
 ------------------------
 
  * Instance ID (`i-xxx`)
+ * Network Interface ID (`eni-xxx`)
  * Security Group ID `(sg-xxx`)
  * Image AMI ID (`ami-xxx`)
  * VPC ID (`vpc-xxx`)
@@ -93,7 +98,8 @@ Supported ACL Parameters
  * Availability Zone (`az:us-west-2*`)          **- Supports shell-style globs**
  * Security Group Name (`sg:my security group`) **- Supports shell-style globs**
  * Tag (`tag:Name=Value`)                       **- Supports shell-style globs**
- * Metadata availability (`any`)                **- Matches if request is from any known EC2 instance**
+ * Type (`type:ec2`)                            **- Current valid types: `ec2` or `lambda`**
+ * Metadata availability (`any`)                **- Matches if request is from any known IP address**
 
 Usage
 -----

@@ -1,22 +1,41 @@
 import asyncio
 import fnmatch
 
-from . import squid
-
 
 @asyncio.coroutine
 def test(request, metadata):
     """Return an ACL action (OK, ERR, or BH) by comparing ACL entries against host metadata"""
 
-    if request.client is None:
+    if not request.client:
         return 'BH', {'log': 'Failed to parse client IP address'}
-    if metadata is None or 'instance_id' not in metadata:
+    if not metadata:
         return 'ERR', {'log': 'Metadata not available for this client'}
     else:
         for entry in request.acl:
             if check_acl_entry(entry, metadata):
-                return 'OK', {'user': metadata['instance_id']}
-        return 'ERR', {'user': metadata['instance_id']}
+                return 'OK', get_user(metadata)
+        return 'ERR', get_user(metadata)
+
+
+def get_user(metadata):
+    user = None
+    for key in 'instance_id', 'network_interface_id':
+        if key in metadata:
+            user = metadata[key]
+
+    if user:
+        name = None
+        if 'tags' in metadata and 'Name' in metadata['tags']:
+            name = metadata['tags']['Name']
+        elif 'description' in metadata:
+            name = metadata['description']
+
+        if name:
+            user = '{0} ({1})'.format(user, name)
+
+        return {'user': user}
+    else:
+        return {}
 
 
 def check_acl_entry(entry, metadata):
@@ -37,30 +56,36 @@ def check_acl_entry(entry, metadata):
     """
 
     if entry.startswith('i-'):
-        return entry == metadata.get('instance_id')
+        return entry == metadata.get('instance_id', None)
+
+    elif entry.startswith('eni-'):
+        for interface in get_interfaces(metadata):
+            if entry == interface.get('network_interface_id'):
+                return True
+        return False
 
     elif entry.startswith('sg-'):
-        for interface in metadata.get('network_interfaces', []):
+        for interface in get_interfaces(metadata):
             for group in interface.get('groups', []):
                 if entry == group.get('group_id'):
                     return True
         return False
 
     elif entry.startswith('ami-'):
-        return entry == metadata.get('image_id')
+        return entry == metadata.get('image_id', None)
 
     elif entry.startswith('vpc-'):
-        return entry == metadata.get('vpc_id')
+        return entry == metadata.get('vpc_id', None)
 
     elif entry.startswith('subnet-'):
-        for interface in metadata.get('network_interfaces', []):
+        for interface in get_interfaces(metadata):
             if entry == interface.get('subnet_id'):
                 return True
         return False
 
     elif entry.startswith('owner:'):
         owner_id = entry[6:].lower()
-        for interface in metadata.get('network_interfaces', []):
+        for interface in get_interfaces(metadata):
             if owner_id == interface.get('owner_id'):
                 return True
         return False
@@ -71,7 +96,7 @@ def check_acl_entry(entry, metadata):
 
     elif entry.startswith('sg:'):
         pattern = entry[3:].lower()
-        for interface in metadata.get('network_interfaces', []):
+        for interface in get_interfaces(metadata):
             for group in interface.get('groups', []):
                 if fnmatch.fnmatch(group.get('group_name', '').lower(), pattern):
                     return True
@@ -86,8 +111,26 @@ def check_acl_entry(entry, metadata):
                 return True
         return False
 
+    elif entry.startswith('type:'):
+        meta_type = entry[5:].lower()
+        if meta_type == 'ec2':
+            return 'instance_id' in metadata
+        elif meta_type == 'lambda':
+            return metadata.get('attachment', {}).get('instance_owner_id', None) == 'aws-lambda'
+        else:
+            return False
+
     elif entry == 'any':
         return True
 
     else:
         return False
+
+
+def get_interfaces(metadata):
+    if 'instance_id' in metadata:
+        return metadata.get('network_interfaces', [])
+    elif 'network_interface_id' in metadata:
+        return [metadata]
+    else:
+        return []

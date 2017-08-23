@@ -33,7 +33,7 @@ class Request:
                 pass
 
         # Everything else is ACL arguments
-        self._acl = parts
+        self._acl = [unquote(p) for p in parts]
 
     @property
     def client(self):
