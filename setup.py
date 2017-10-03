@@ -14,9 +14,6 @@ with open("aws_acl_helper/version.py") as fp:
 with open('README.rst') as f:
     readme = f.read()
 
-with open('LICENSE') as f:
-    license = f.read()
-
 with open('requirements.txt') as f:
     requirements = f.read().splitlines()
 
@@ -29,11 +26,20 @@ setup(
     author_email='brad@oatmail.org',
     url='https://github.com/brandond/aws-acl-helper',
     download_url='https://github.com/brandond/aws-acl-helper/tarball/{}'.format(version['__version__']),
-    license=license,
+    license='Apache',
     packages=find_packages(exclude=('docs')),
     entry_points={
         'console_scripts': ['aws-acl-helper=aws_acl_helper.commands:cli']
     },
     include_package_data=True,
     install_requires=requirements,
+    python_requires='>=3.5',
+    classifiers=[
+        'Development Status :: 4 - Beta',
+        'License :: OSI Approved :: Apache Software License',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Topic :: Internet :: Proxy Servers',
+    ],
+
 )
