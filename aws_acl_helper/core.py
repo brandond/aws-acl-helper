@@ -66,6 +66,9 @@ def async_input(config,):
         if sock:
             reader, writer = yield from accept_socket(sock)
         else:
+            print('WARNING: aws-acl-helper did not detect squid socket, using stdio.  '
+                  'See brandond/aws-acl-helper#2',
+                  file=sys.stderr, flush=True)
             reader, writer = yield from stdio()
 
     while True:
