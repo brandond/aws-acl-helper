@@ -2,6 +2,8 @@
 
 import asyncio
 import os
+import socket
+import stat
 import sys
 from asyncio.streams import FlowControlMixin, StreamWriter
 
@@ -10,6 +12,16 @@ import click
 from . import aclmatch, config, metadata, squid
 
 reader, writer = None, None
+
+
+def squid_inherited_socket():
+    """Detect socket passed from squid via fds 0 and 1"""
+    stat_in = os.fstat(0)
+    stat_out = os.fstat(1)
+    if os.path.samestat(stat_in, stat_out) and stat.S_ISSOCK(stat_in.st_mode):
+        return socket.socket(fileno=0)
+    else:
+        return None
 
 
 @asyncio.coroutine
@@ -30,13 +42,31 @@ def stdio(loop=None):
 
 
 @asyncio.coroutine
+def accept_socket(sock, loop=None):
+    """Setup stream handlers for an already accepted socket"""
+    if loop is None:
+        loop = asyncio.get_event_loop()
+
+    reader = asyncio.StreamReader(loop=loop)
+    protocol = asyncio.StreamReaderProtocol(reader, loop=loop)
+    transport, _ = yield from loop.connect_accepted_socket(
+        lambda: protocol, sock=sock)
+    writer = StreamWriter(transport, protocol, reader, loop)
+    return reader, writer
+
+
+@asyncio.coroutine
 def async_input(config,):
     """Handle reading lines from stdin and handing off to background task for processing"""
     loop = asyncio.get_event_loop()
 
     global reader, writer
     if (reader, writer) == (None, None):
-        reader, writer = yield from stdio()
+        sock = squid_inherited_socket()
+        if sock:
+            reader, writer = yield from accept_socket(sock)
+        else:
+            reader, writer = yield from stdio()
 
     while True:
         line = yield from reader.readline()
