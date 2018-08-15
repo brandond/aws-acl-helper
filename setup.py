@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
-
 import sys
-from setuptools import setup, find_packages
+from os import chdir
+from os.path import abspath, dirname
 
-if sys.version_info < (3, 4):
-    raise RuntimeError("aws-acl-helper doesn't support Python versions below 3.4")
+from setuptools import find_packages, setup
 
-version = {}
+chdir(dirname(abspath(__file__)))
 
-with open("aws_acl_helper/version.py") as fp:
-    exec(fp.read(), version)
+if sys.version_info < (3, 5):
+    raise RuntimeError("aws-acl-helper doesn't support Python versions below 3.5")
 
 with open('README.rst') as f:
     readme = f.read()
@@ -19,13 +18,12 @@ with open('requirements.txt') as f:
 
 setup(
     name='aws-acl-helper',
-    version=version['__version__'],
+    version_command=('git describe --tags --dirty', 'pep440-git-full'),
     description='Squid external ACL helper that allows use of AWS instance metadata',
     long_description=readme,
     author='Brandon Davidson',
     author_email='brad@oatmail.org',
     url='https://github.com/brandond/aws-acl-helper',
-    download_url='https://github.com/brandond/aws-acl-helper/tarball/{}'.format(version['__version__']),
     license='Apache',
     packages=find_packages(exclude=('docs')),
     entry_points={
@@ -41,5 +39,9 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Topic :: Internet :: Proxy Servers',
     ],
-
+    extras_require={
+        'dev': [
+            'setuptools-version-command',
+        ]
+    },
 )
