@@ -1,5 +1,6 @@
-click
-boto3
-asyncio
 aioredis >= 0.2.8, < 1.0.0
+asyncio
+boto3
+click
 configparser >= 3.5.0
+setuptools-version-command >= 2.2

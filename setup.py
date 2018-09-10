@@ -34,11 +34,6 @@ setup(
     entry_points={
         'console_scripts': ['aws-acl-helper=aws_acl_helper.commands:cli']
     },
-    extras_require={
-        'dev': [
-            'setuptools-version-command',
-        ]
-    },
     include_package_data=True,
     install_requires=requirements,
     long_description=readme,
