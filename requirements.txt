@@ -3,4 +3,3 @@ asyncio
 boto3
 click
 configparser >= 3.5.0
-setuptools-version-command >= 2.2
