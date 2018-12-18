@@ -1,7 +1,7 @@
 AWS ACL Helper
 ==============
 [![PyPI version](https://badge.fury.io/py/aws-acl-helper.svg)](https://badge.fury.io/py/aws-acl-helper)
-[![Build Status](https://travis-ci.org/brandond/aws-acl-helper.svg?branch=master)](https://travis-ci.org/brandond/aws-acl-helper)
+[![Build Status](https://travis-ci.com/brandond/aws-acl-helper.svg?branch=master)](https://travis-ci.com/brandond/aws-acl-helper)
 
 This module implements the Squid External ACL Helper interface, and allows for
 use of EC2 instance metadata in ACL entries. It uses the client's source
