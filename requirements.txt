@@ -1,4 +1,4 @@
-aioredis >= 0.2.8, < 1.0.0
+aioredis >= 1.0.0
 asyncio
 boto3
 click

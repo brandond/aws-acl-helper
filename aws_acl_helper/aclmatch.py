@@ -31,7 +31,7 @@ def get_user(metadata):
             name = metadata['description']
 
         if name:
-            user = '{0} ({1})'.format(user, name)
+            user = f'{user} ({name})'
 
         return {'user': user}
     else:

@@ -66,13 +66,13 @@ class Request:
                 # FIXME - log this
                 pass
 
-        # Include channe if it was specified in the request
+        # Include channel if it was specified in the request
         if self._channel != -1:
             chan = str(self._channel)
 
         # Join together valid keywords
         if len(keywords) > 0:
-            pair = ' '.join(['{}={}'.format(item[0], quote(item[1])) for item in keywords.items()])
+            pair = ' '.join([f'{item[0]}={quote(item[1])}' for item in keywords.items()])
 
         # Only include defined items in response line
         line = ' '.join([p for p in [chan, result, pair] if p is not None])+'\n'

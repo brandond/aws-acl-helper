@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import time
 
 import boto3
@@ -9,6 +10,7 @@ import click
 from . import config, metadata
 
 _session_cache = {}
+logger = logging.getLogger(__name__)
 
 
 def camel_dict_to_snake_dict(camel_dict):
@@ -72,14 +74,14 @@ def get_instance_region():
             if val[0] == '{':
                 data = json.loads(val)
     except botocore.utils._RetriesExceededError:
-        print("Max number of attempts exceeded ({0}) when attempting to retrieve data from metadata service.".format(fetcher._num_attempts))
+        logger.error(f'Max number of attempts exceeded ({fetcher._num_attempts}) when attempting to retrieve data from metadata service.')
 
     return data.get('region', None)
 
 
 def get_session(config):
     if config.profile_name not in _session_cache:
-        print('Creating new Boto3 Session for profile {0}'.format(config.profile_name))
+        logger.info(f'Creating new Boto3 Session for profile {config.profile_name}')
         _session_cache[config.profile_name] = boto3.Session(profile_name=config.profile_name)
 
     session = _session_cache[config.profile_name]
@@ -87,9 +89,9 @@ def get_session(config):
     if config.role_arn:
         if config.role_arn not in _session_cache:
             sts_client = session.client('sts')
-            role_session_name = '{0}.session-{1}'.format(__name__, time.time())
+            role_session_name = f'{__name__}.session-{time.time()}'
 
-            print('Assuming role {0}'.format(config.role_arn))
+            logger.info(f'Assuming role {config.role_arn}')
             assumed_role = sts_client.assume_role(RoleArn=config.role_arn,
                                                   ExternalId=config.external_id,
                                                   RoleSessionName=role_session_name)
@@ -112,7 +114,7 @@ def store_aws_metadata(config):
         regions = session.get_available_regions('ec2')
 
     for region in regions:
-        print('Describing instances in {0}'.format(region))
+        logger.info(f'Describing instances in {region}')
         ec2_client = session.client('ec2', region)
         tasks = []
 
@@ -124,20 +126,20 @@ def store_aws_metadata(config):
                 for instance in reservation.get('Instances', []):
                     instance = camel_dict_to_snake_dict(instance)
                     instance['tags'] = tag_list_to_dict(instance.get('tags', []))
-                    print('Storing data for {instance_id}'.format(**instance))
+                    logger.info(f'Storing data for {instance["instance_id"]}')
                     tasks.append(loop.create_task(metadata.store_instance(config, instance)))
         except Exception as e:
-            print('Failed to store instance information: {0}'.format(e))
+            logger.error(f'Failed to store instance information: {e}', exc_info=True)
 
         try:
             interfaces = ec2_client.describe_network_interfaces()
             for interface in interfaces.get('NetworkInterfaces', []):
                 interface = camel_dict_to_snake_dict(interface)
                 interface['tags'] = tag_list_to_dict(interface.pop('tag_set', []))
-                print('Storing data for {network_interface_id}'.format(**interface))
+                logger.info(f'Storing data for {interface["network_interface_id"]}')
                 tasks.append(loop.create_task(metadata.store_interface(config, interface)))
         except Exception as e:
-            print('Failed to store interface information: {0}'.format(e))
+            logger.error(f'Failed to store interface information: {e}')
 
     if len(tasks) > 0:
         loop.run_until_complete(asyncio.wait(tasks))
@@ -186,6 +188,7 @@ def store_aws_metadata(config):
 )
 @click.command(short_help='Collect EC2 inventory and store to Redis.')
 def sync(**args):
+    logging.basicConfig(level='INFO')
     _config = config.Config(**args)
     store_aws_metadata(_config)
     asyncio.get_event_loop().stop()
@@ -199,6 +202,7 @@ def sync(**args):
 )
 @click.command('sync-multi', short_help='Collect EC2 inventory from multiple accounts.')
 def sync_multi(**args):
+    logging.basicConfig(level='INFO', format='%(message)s')
     for _config in config.parse_file(args['config']):
         store_aws_metadata(_config)
     asyncio.get_event_loop().stop()

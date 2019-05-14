@@ -22,8 +22,7 @@ end
 """
 
 
-@asyncio.coroutine
-def lookup(config, request):
+async def lookup(config, request):
     global pool
     global lock
 
@@ -34,24 +33,23 @@ def lookup(config, request):
 
     # standard check/lock/check pattern to ensure only one thread creates a connection pool
     if pool is None:
-        with (yield from lock):
+        async with lock:
             if pool is None:
-                pool = yield from aioredis.create_pool((config.redis_host, config.redis_port), minsize=2, maxsize=20)
+                pool = await aioredis.create_pool((config.redis_host, config.redis_port), minsize=2, maxsize=20)
 
     # Call the eval script to lookup IP and retrieve instance data.
     # Could probably optimize this by storing the script server-side
     # during initial pool creation.
-    with (yield from pool) as redis:
-        pickle_data = yield from redis.eval(KEY_SCRIPT, args=[KEY_IP, str(request.client)])
+    with await pool as conn:
+        pickle_data = await aioredis.Redis(conn).eval(KEY_SCRIPT, args=[KEY_IP, str(request.client)])
         if pickle_data is not None:
             metadata = pickle.loads(pickle_data)
 
     return metadata
 
 
-@asyncio.coroutine
-def store_instance(config, instance):
-    redis = yield from aioredis.create_redis((config.redis_host, config.redis_port))
+async def store_instance(config, instance):
+    redis = await aioredis.create_redis((config.redis_host, config.redis_port))
     pipe = redis.pipeline()
     instance_id = instance['instance_id']
 
@@ -60,16 +58,15 @@ def store_instance(config, instance):
 
     # Store intermediate key lookups so that we can find an instance given only its IP address
     for interface in instance.get('network_interfaces', []):
-        yield from store_interface(config, interface, KEY_I + instance_id, None)
+        await store_interface(config, interface, KEY_I + instance_id, None)
 
-    yield from pipe.execute()
+    await pipe.execute()
     redis.close()
-    yield from redis.wait_closed()
+    await redis.wait_closed()
 
 
-@asyncio.coroutine
-def store_interface(config, interface, key=None, exist='SET_IF_NOT_EXIST'):
-    redis = yield from aioredis.create_redis((config.redis_host, config.redis_port))
+async def store_interface(config, interface, key=None, exist='SET_IF_NOT_EXIST'):
+    redis = await aioredis.create_redis((config.redis_host, config.redis_port))
     pipe = redis.pipeline()
     interface_id = interface['network_interface_id']
 
@@ -85,24 +82,23 @@ def store_interface(config, interface, key=None, exist='SET_IF_NOT_EXIST'):
     for address in interface.get('private_ip_addresses', []):
         pipe.set(key=KEY_IP + address['private_ip_address'], value=key, expire=int(config.redis_ttl), exist=exist)
 
-    yield from pipe.execute()
+    await pipe.execute()
     redis.close()
-    yield from redis.wait_closed()
+    await redis.wait_closed()
 
 
-@asyncio.coroutine
-def close():
+async def close():
     global pool
     global lock
 
     if pool is not None:
-        with (yield from lock):
+        async with lock:
             if pool is not None:
                 # Wait for all pool connections to become free, indicating that no tasks are currently using it
                 while pool.freesize != pool.size:
-                    yield from asyncio.sleep(1)
+                    await asyncio.sleep(1)
 
                 # Ask the connection pool to close any open connections, and wait for it to do so
                 pool.close()
-                yield from pool.wait_closed()
+                await pool.wait_closed()
                 pool = None

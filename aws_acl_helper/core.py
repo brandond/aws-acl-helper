@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import asyncio
+import logging
 import os
 import socket
 import stat
@@ -12,6 +13,7 @@ import click
 from . import aclmatch, config, metadata, squid
 
 reader, writer = None, None
+logger = logging.getLogger(__name__)
 
 
 def squid_inherited_socket():
@@ -24,8 +26,7 @@ def squid_inherited_socket():
         return None
 
 
-@asyncio.coroutine
-def stdio(loop=None):
+async def stdio(loop=None):
     """Set up stdin/stdout stream handlers"""
     if loop is None:
         loop = asyncio.get_event_loop()
@@ -33,30 +34,28 @@ def stdio(loop=None):
     reader = asyncio.StreamReader()
     reader_protocol = asyncio.StreamReaderProtocol(reader)
 
-    writer_transport, writer_protocol = yield from loop.connect_write_pipe(FlowControlMixin, os.fdopen(0, 'wb'))
+    writer_transport, writer_protocol = await loop.connect_write_pipe(FlowControlMixin, os.fdopen(0, 'wb'))
     writer = StreamWriter(writer_transport, writer_protocol, None, loop)
 
-    yield from loop.connect_read_pipe(lambda: reader_protocol, sys.stdin)
+    await loop.connect_read_pipe(lambda: reader_protocol, sys.stdin)
 
     return reader, writer
 
 
-@asyncio.coroutine
-def accept_socket(sock, loop=None):
+async def accept_socket(sock, loop=None):
     """Setup stream handlers for an already accepted socket"""
     if loop is None:
         loop = asyncio.get_event_loop()
 
     reader = asyncio.StreamReader(loop=loop)
     protocol = asyncio.StreamReaderProtocol(reader, loop=loop)
-    transport, _ = yield from loop.connect_accepted_socket(
+    transport, _ = await loop.connect_accepted_socket(
         lambda: protocol, sock=sock)
     writer = StreamWriter(transport, protocol, reader, loop)
     return reader, writer
 
 
-@asyncio.coroutine
-def async_input(config,):
+async def async_input(config):
     """Handle reading lines from stdin and handing off to background task for processing"""
     loop = asyncio.get_event_loop()
 
@@ -64,29 +63,26 @@ def async_input(config,):
     if (reader, writer) == (None, None):
         sock = squid_inherited_socket()
         if sock:
-            reader, writer = yield from accept_socket(sock)
+            reader, writer = await accept_socket(sock)
         else:
-            print('WARNING: aws-acl-helper did not detect squid socket, using stdio.  '
-                  'See brandond/aws-acl-helper#2',
-                  file=sys.stderr, flush=True)
-            reader, writer = yield from stdio()
+            logger.warn('aws-acl-helper did not detect squid socket, using stdio. See brandond/aws-acl-helper#2')
+            reader, writer = await stdio()
 
     while True:
-        line = yield from reader.readline()
+        line = await reader.readline()
         if config.debug_enabled:
-            print('STDIN: {}'.format(line), file=sys.stderr, flush=True)
+            logger.debug(f'STDIN: {line}')
 
         # Readline returns empty bystes string when the socket is closed
         if line == b'':
-            yield from metadata.close()
+            await metadata.close()
             return
 
         # Process line in background task
         loop.create_task(handle_line(config, line))
 
 
-@asyncio.coroutine
-def handle_line(config, line):
+async def handle_line(config, line):
     """Run an ACL lookup request line from Squid through the processing pipeline."""
     global writer
 
@@ -98,13 +94,14 @@ def handle_line(config, line):
         request = squid.Request(line)
 
         # Get metadata from Redis back-end
-        hostinfo = yield from metadata.lookup(config, request)
+        hostinfo = await metadata.lookup(config, request)
 
         # Use metadata to make access decision (OK, ERR, or BH)
-        result, pairs = yield from aclmatch.test(request, hostinfo)
+        result, pairs = await aclmatch.test(request, hostinfo)
 
     except Exception as e:
-        pairs = {'log': 'Exception encountered handling request: '+str(e)}
+        logger.error(f'Exception encountered handling request: {e}', exc_info=True)
+        pairs = {'log': f'Exception encountered handling request: {e}'}
         # Only discard the request if we failed to parse the input from Squid - ensures
         # that errors are reported properly when using concurrency.
         if request is None:
@@ -112,11 +109,10 @@ def handle_line(config, line):
 
     # Output response to Squid
     response = request.make_response(result, pairs)
-    if config.debug_enabled:
-        print('STDOUT: {}'.format(response), file=sys.stderr, flush=True)
+    logger.debug(f'STDOUT: {line}')
 
     writer.write(response)
-    yield from writer.drain()
+    await writer.drain()
 
 
 @click.option(
@@ -140,5 +136,9 @@ def handle_line(config, line):
 def listen(**args):
     _config = config.Config(**args)
     loop = asyncio.get_event_loop()
-    loop.set_debug(_config.debug_enabled)
+    if _config.debug_enabled:
+        loop.set_debug(1)
+        logging.basicConfig(level='DEBUG', format='%(message)s')
+    else:
+        logging.basicConfig(level='WARNING', format='%(message)s')
     loop.run_until_complete(async_input(_config))
