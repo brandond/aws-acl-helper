@@ -69,10 +69,10 @@ def get_instance_region():
     fetcher = botocore.utils.InstanceMetadataFetcher()
 
     try:
-        r = fetcher._get_request('http://169.254.169.254/latest/dynamic/instance-identity/document', fetcher._needs_retry_for_credentials)
+        r = fetcher._get_request('latest/dynamic/instance-identity/document', fetcher._needs_retry_for_credentials)
         data = json.loads(r.text)
     except botocore.utils._RetriesExceededError:
-        logger.error(f'Max number of attempts exceeded ({fetcher._num_attempts}) when attempting to retrieve data from metadata service.')
+        logger.warn(f'Max number of attempts exceeded ({fetcher._num_attempts}) when attempting to retrieve region from metadata service.')
 
     return data.get('region', None)
 
@@ -119,7 +119,11 @@ async def store_aws_metadata(config):
     async with RedisMetadataStore(config) as metadata:
         for region in regions:
             logger.info(f'Describing instances in {region}')
-            ec2_client = session.client('ec2', region)
+            try:
+                ec2_client = session.client('ec2', region)
+            except Exception as e:
+                logger.error(f'Failed to create EC2 client: {e}')
+                return
 
             # Find all instances, convert to snake dict, convert to tags, store in redis
             try:
@@ -131,7 +135,8 @@ async def store_aws_metadata(config):
                         logger.info(f'Storing data for {instance["instance_id"]}')
                         await metadata.store_instance(instance)
             except Exception as e:
-                logger.error(f'Failed to store instance information: {e}', exc_info=True)
+                logger.error(f'Failed to sync instance information: {e}')
+                return
 
             try:
                 interfaces = ec2_client.describe_network_interfaces()
@@ -141,7 +146,8 @@ async def store_aws_metadata(config):
                     logger.info(f'Storing data for {interface["network_interface_id"]}')
                     await metadata.store_interface(interface)
             except Exception as e:
-                logger.error(f'Failed to store interface information: {e}')
+                logger.error(f'Failed to sync interface information: {e}')
+                return
 
 
 @click.option(
