@@ -1,10 +1,10 @@
 import asyncio
+import logging
 import pickle
 
 import aioredis
 
-pool = None
-lock = asyncio.Lock()
+logger = logging.getLogger(__name__)
 
 # Redis key prefixes
 KEY_ENI = __name__ + '^interface^'
@@ -22,83 +22,70 @@ end
 """
 
 
-async def lookup(config, request):
-    global pool
-    global lock
+class RedisMetadataStore(object):
+    def __init__(self, config):
+        self.config = config
+        self.pool = None
 
-    if request.client is None:
-        return None
+    async def __aenter__(self):
+        try:
+            self.pool = await aioredis.create_pool((self.config.redis_host, self.config.redis_port), minsize=1, maxsize=20)
+            return self
+        except Exception as e:
+            logger.error(f'Unable to connect to Redis server: {e}')
+            raise SystemExit(1)
 
-    metadata = None
+    async def __aexit__(self, exc_type, exc, tb):
+        if self.pool is not None:
+            # Wait for all pool connections to become free, indicating that no tasks are currently using it
+            while self.pool.freesize != self.pool.size:
+                await asyncio.sleep(1)
 
-    # standard check/lock/check pattern to ensure only one thread creates a connection pool
-    if pool is None:
-        async with lock:
-            if pool is None:
-                pool = await aioredis.create_pool((config.redis_host, config.redis_port), minsize=2, maxsize=20)
+            # Ask the connection pool to close any open connections, and wait for it to do so
+            self.pool.close()
+            await self.pool.wait_closed()
 
-    # Call the eval script to lookup IP and retrieve instance data.
-    # Could probably optimize this by storing the script server-side
-    # during initial pool creation.
-    with await pool as conn:
-        pickle_data = await aioredis.Redis(conn).eval(KEY_SCRIPT, args=[KEY_IP, str(request.client)])
-        if pickle_data is not None:
-            metadata = pickle.loads(pickle_data)
+    async def lookup(self, request):
+        if request.client is None:
+            return None
 
-    return metadata
+        metadata = None
 
+        # Call the eval script to lookup IP and retrieve instance data.
+        # Could probably optimize this by storing the script server-side
+        # during initial pool creation.
+        with await self.pool as conn:
+            pickle_data = await aioredis.Redis(conn).eval(KEY_SCRIPT, args=[KEY_IP, str(request.client)])
+            if pickle_data is not None:
+                metadata = pickle.loads(pickle_data)
 
-async def store_instance(config, instance):
-    redis = await aioredis.create_redis((config.redis_host, config.redis_port))
-    pipe = redis.pipeline()
-    instance_id = instance['instance_id']
+        return metadata
 
-    # Store pickled instance data keyed off instance ID
-    pipe.set(key=KEY_I + instance_id, value=pickle.dumps(instance), expire=int(config.redis_ttl))
+    async def store_instance(self, instance):
+        instance_id = instance['instance_id']
 
-    # Store intermediate key lookups so that we can find an instance given only its IP address
-    for interface in instance.get('network_interfaces', []):
-        await store_interface(config, interface, KEY_I + instance_id, None)
+        for interface in instance.get('network_interfaces', []):
+            await self.store_interface(interface, KEY_I + instance_id)
 
-    await pipe.execute()
-    redis.close()
-    await redis.wait_closed()
+        with await self.pool as conn:
+            redis = aioredis.Redis(conn)
 
+            # Store pickled instance data keyed off instance ID
+            await redis.set(key=KEY_I + instance_id, value=pickle.dumps(instance), expire=int(self.config.redis_ttl))
 
-async def store_interface(config, interface, key=None, exist='SET_IF_NOT_EXIST'):
-    redis = await aioredis.create_redis((config.redis_host, config.redis_port))
-    pipe = redis.pipeline()
-    interface_id = interface['network_interface_id']
+    async def store_interface(self, interface, key=None, exist='SET_IF_NOT_EXIST'):
+        with await self.pool as conn:
+            redis = aioredis.Redis(conn)
+            interface_id = interface['network_interface_id']
 
-    # Only store picked interface data if using default key (not fixed key from instance)
-    if not key:
-        key = KEY_ENI + interface_id
-        pipe.set(key=KEY_ENI + interface_id, value=pickle.dumps(interface), expire=int(config.redis_ttl))
+            # Only store picked interface data if using default key (not fixed key from instance)
+            if not key:
+                key = KEY_ENI + interface_id
+                await redis.set(key=KEY_ENI + interface_id, value=pickle.dumps(interface), expire=int(self.config.redis_ttl))
 
-    # Store intermediate key lookups so that we can find metadata given only an IP address
-    if 'association' in interface:
-        pipe.set(key=KEY_IP + interface['association']['public_ip'], value=key, expire=int(config.redis_ttl), exist=exist)
+            # Store intermediate key lookups so that we can find metadata given only an IP address
+            if 'association' in interface:
+                await redis.set(key=KEY_IP + interface['association']['public_ip'], value=key, expire=int(self.config.redis_ttl), exist=exist)
 
-    for address in interface.get('private_ip_addresses', []):
-        pipe.set(key=KEY_IP + address['private_ip_address'], value=key, expire=int(config.redis_ttl), exist=exist)
-
-    await pipe.execute()
-    redis.close()
-    await redis.wait_closed()
-
-
-async def close():
-    global pool
-    global lock
-
-    if pool is not None:
-        async with lock:
-            if pool is not None:
-                # Wait for all pool connections to become free, indicating that no tasks are currently using it
-                while pool.freesize != pool.size:
-                    await asyncio.sleep(1)
-
-                # Ask the connection pool to close any open connections, and wait for it to do so
-                pool.close()
-                await pool.wait_closed()
-                pool = None
+            for address in interface.get('private_ip_addresses', []):
+                await redis.set(key=KEY_IP + address['private_ip_address'], value=key, expire=int(self.config.redis_ttl), exist=exist)

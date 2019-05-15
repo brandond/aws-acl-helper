@@ -7,7 +7,8 @@ import boto3
 import botocore
 import click
 
-from . import config, metadata
+from .config import Config, parse_file
+from .metadata import RedisMetadataStore
 
 _session_cache = {}
 logger = logging.getLogger(__name__)
@@ -95,6 +96,7 @@ def get_session(config):
             assumed_role = sts_client.assume_role(RoleArn=config.role_arn,
                                                   ExternalId=config.external_id,
                                                   RoleSessionName=role_session_name)
+            logger.info(f'Creating new Boto3 Session for role {config.role_arn}')
             _session_cache[config.role_arn] = boto3.Session(aws_access_key_id=assumed_role['Credentials']['AccessKeyId'],
                                                             aws_secret_access_key=assumed_role['Credentials']['SecretAccessKey'],
                                                             aws_session_token=assumed_role['Credentials']['SessionToken'])
@@ -104,47 +106,52 @@ def get_session(config):
     return session
 
 
-def store_aws_metadata(config):
+async def store_aws_metadata(config):
     """Store AWS metadata (result of ec2.describe_instances call) into Redis"""
-    loop = asyncio.get_event_loop()
-    session = get_session(config)
+    try:
+        session = get_session(config)
+    except botocore.exceptions.ClientError as e:
+        logger.error(f'Unable to get Boto3 Session: {e}')
+        raise SystemExit(1)
+
     regions = [config.region_name or session.region_name or get_instance_region()]
 
     if 'all' in regions:
         regions = session.get_available_regions('ec2')
 
-    for region in regions:
-        logger.info(f'Describing instances in {region}')
-        ec2_client = session.client('ec2', region)
-        tasks = []
+    async with RedisMetadataStore(config) as metadata:
+        for region in regions:
+            logger.info(f'Describing instances in {region}')
+            ec2_client = session.client('ec2', region)
 
-        # Find all instances, convert to snake dict, convert to tags, and fire off
-        # task to store in Redis
-        try:
-            instances = ec2_client.describe_instances()
-            for reservation in instances.get('Reservations', []):
-                for instance in reservation.get('Instances', []):
-                    instance = camel_dict_to_snake_dict(instance)
-                    instance['tags'] = tag_list_to_dict(instance.get('tags', []))
-                    logger.info(f'Storing data for {instance["instance_id"]}')
-                    tasks.append(loop.create_task(metadata.store_instance(config, instance)))
-        except Exception as e:
-            logger.error(f'Failed to store instance information: {e}', exc_info=True)
+            # Find all instances, convert to snake dict, convert to tags, store in redis
+            try:
+                instances = ec2_client.describe_instances()
+                for reservation in instances.get('Reservations', []):
+                    for instance in reservation.get('Instances', []):
+                        instance = camel_dict_to_snake_dict(instance)
+                        instance['tags'] = tag_list_to_dict(instance.get('tags', []))
+                        logger.info(f'Storing data for {instance["instance_id"]}')
+                        await metadata.store_instance(instance)
+            except Exception as e:
+                logger.error(f'Failed to store instance information: {e}', exc_info=True)
 
-        try:
-            interfaces = ec2_client.describe_network_interfaces()
-            for interface in interfaces.get('NetworkInterfaces', []):
-                interface = camel_dict_to_snake_dict(interface)
-                interface['tags'] = tag_list_to_dict(interface.pop('tag_set', []))
-                logger.info(f'Storing data for {interface["network_interface_id"]}')
-                tasks.append(loop.create_task(metadata.store_interface(config, interface)))
-        except Exception as e:
-            logger.error(f'Failed to store interface information: {e}')
-
-    if len(tasks) > 0:
-        loop.run_until_complete(asyncio.wait(tasks))
+            try:
+                interfaces = ec2_client.describe_network_interfaces()
+                for interface in interfaces.get('NetworkInterfaces', []):
+                    interface = camel_dict_to_snake_dict(interface)
+                    interface['tags'] = tag_list_to_dict(interface.pop('tag_set', []))
+                    logger.info(f'Storing data for {interface["network_interface_id"]}')
+                    await metadata.store_interface(interface)
+            except Exception as e:
+                logger.error(f'Failed to store interface information: {e}')
 
 
+@click.option(
+    '--debug',
+    is_flag=True,
+    help="Enable debug logging to STDERR."
+)
 @click.option(
     '--ttl',
     default=1800,
@@ -188,12 +195,24 @@ def store_aws_metadata(config):
 )
 @click.command(short_help='Collect EC2 inventory and store to Redis.')
 def sync(**args):
-    logging.basicConfig(level='INFO')
-    _config = config.Config(**args)
-    store_aws_metadata(_config)
-    asyncio.get_event_loop().stop()
+    loop = asyncio.get_event_loop()
+    sync_config = Config(**args)
+
+    if sync_config.debug_enabled:
+        logging.basicConfig(level='DEBUG')
+        loop.set_debug(1)
+    else:
+        logging.basicConfig(level='INFO', format='%(message)s')
+
+    loop.run_until_complete(store_aws_metadata(sync_config))
+    loop.close()
 
 
+@click.option(
+    '--debug',
+    is_flag=True,
+    help="Enable debug logging to STDERR."
+)
 @click.option(
     '--config',
     required=True,
@@ -201,8 +220,16 @@ def sync(**args):
     help='Path to configuration file describing accounts and regions to sync.'
 )
 @click.command('sync-multi', short_help='Collect EC2 inventory from multiple accounts.')
-def sync_multi(**args):
-    logging.basicConfig(level='INFO', format='%(message)s')
-    for _config in config.parse_file(args['config']):
-        store_aws_metadata(_config)
-    asyncio.get_event_loop().stop()
+def sync_multi(debug, config):
+    loop = asyncio.get_event_loop()
+
+    if debug:
+        logging.basicConfig(level='DEBUG')
+        loop.set_debug(1)
+    else:
+        logging.basicConfig(level='INFO', format='%(message)s')
+
+    for sync_config in parse_file(config):
+        loop.run_until_complete(store_aws_metadata(sync_config))
+
+    loop.close()

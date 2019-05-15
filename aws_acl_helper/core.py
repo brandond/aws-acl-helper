@@ -10,7 +10,9 @@ from asyncio.streams import FlowControlMixin, StreamWriter
 
 import click
 
-from . import aclmatch, config, metadata, squid
+from . import aclmatch, squid
+from .config import Config
+from .metadata import RedisMetadataStore
 
 reader, writer = None, None
 logger = logging.getLogger(__name__)
@@ -68,21 +70,20 @@ async def async_input(config):
             logger.warn('aws-acl-helper did not detect squid socket, using stdio. See brandond/aws-acl-helper#2')
             reader, writer = await stdio()
 
-    while True:
-        line = await reader.readline()
-        if config.debug_enabled:
+    async with RedisMetadataStore(config) as metadata:
+        while True:
+            line = await reader.readline()
             logger.debug(f'STDIN: {line}')
 
-        # Readline returns empty bystes string when the socket is closed
-        if line == b'':
-            await metadata.close()
-            return
+            # Readline returns empty bystes string when the socket is closed
+            if line == b'':
+                return
 
-        # Process line in background task
-        loop.create_task(handle_line(config, line))
+            # Process line in background task
+            loop.create_task(handle_line(metadata, line))
 
 
-async def handle_line(config, line):
+async def handle_line(metadata, line):
     """Run an ACL lookup request line from Squid through the processing pipeline."""
     global writer
 
@@ -94,7 +95,7 @@ async def handle_line(config, line):
         request = squid.Request(line)
 
         # Get metadata from Redis back-end
-        hostinfo = await metadata.lookup(config, request)
+        hostinfo = await metadata.lookup(request)
 
         # Use metadata to make access decision (OK, ERR, or BH)
         result, pairs = await aclmatch.test(request, hostinfo)
@@ -134,11 +135,11 @@ async def handle_line(config, line):
 )
 @click.command(short_help='Handle ACL lookup requests from Squid.')
 def listen(**args):
-    _config = config.Config(**args)
+    listen_config = Config(**args)
     loop = asyncio.get_event_loop()
-    if _config.debug_enabled:
+    if listen_config.debug_enabled:
         loop.set_debug(1)
         logging.basicConfig(level='DEBUG', format='%(message)s')
     else:
         logging.basicConfig(level='WARNING', format='%(message)s')
-    loop.run_until_complete(async_input(_config))
+    loop.run_until_complete(async_input(listen_config))
