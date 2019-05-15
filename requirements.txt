@@ -1,5 +1,6 @@
 aioredis >= 1.0.0
 asyncio
-boto3
+botocore == 1.12.149
+boto3 == 1.9.149
 click
 configparser >= 3.5.0

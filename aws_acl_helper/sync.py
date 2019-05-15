@@ -69,11 +69,8 @@ def get_instance_region():
     fetcher = botocore.utils.InstanceMetadataFetcher()
 
     try:
-        r = fetcher._get_request('http://169.254.169.254/latest/dynamic/instance-identity/document', fetcher._timeout, fetcher._num_attempts)
-        if r.content:
-            val = r.content.decode('utf-8')
-            if val[0] == '{':
-                data = json.loads(val)
+        r = fetcher._get_request('http://169.254.169.254/latest/dynamic/instance-identity/document', fetcher._needs_retry_for_credentials)
+        data = json.loads(r.text)
     except botocore.utils._RetriesExceededError:
         logger.error(f'Max number of attempts exceeded ({fetcher._num_attempts}) when attempting to retrieve data from metadata service.')
 
