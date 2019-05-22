@@ -65,7 +65,7 @@ class RedisMetadataStore(object):
         instance_id = instance['instance_id']
 
         for interface in instance.get('network_interfaces', []):
-            await self.store_interface(interface, KEY_I + instance_id)
+            await self.store_interface(interface, KEY_I + instance_id, None)
 
         with await self.pool as conn:
             redis = aioredis.Redis(conn)
