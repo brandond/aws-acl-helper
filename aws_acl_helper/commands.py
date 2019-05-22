@@ -1,7 +1,7 @@
 import click
 from pkg_resources import get_distribution
 
-from . import core, sync
+from . import listen, sync
 
 
 def _print_version(ctx, param, value):
@@ -24,7 +24,7 @@ def cli():
     pass
 
 
-cli.add_command(core.listen)
+cli.add_command(listen.listen)
 cli.add_command(sync.sync)
 cli.add_command(sync.sync_multi)
 

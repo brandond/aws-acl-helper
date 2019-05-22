@@ -22,7 +22,7 @@ end
 """
 
 
-class RedisMetadataStore(object):
+class RedisMetadataReader(object):
     def __init__(self, config):
         self.config = config
         self.pool = None
@@ -44,6 +44,7 @@ class RedisMetadataStore(object):
             # Ask the connection pool to close any open connections, and wait for it to do so
             self.pool.close()
             await self.pool.wait_closed()
+            self.pool = None
 
     async def lookup(self, request):
         if request.client is None:
@@ -61,31 +62,51 @@ class RedisMetadataStore(object):
 
         return metadata
 
+
+class RedisMetadataWriter(object):
+    def __init__(self, config):
+        self.config = config
+        self.conn = None
+
+    async def __aenter__(self):
+        try:
+            self.conn = await aioredis.create_connection((self.config.redis_host, self.config.redis_port))
+            await self.conn.execute('MULTI')
+            return self
+        except Exception as e:
+            logger.error(f'Unable to connect to Redis server: {e}')
+            raise SystemExit(1)
+
+    async def __aexit__(self, exc_type, exc, tb):
+        if self.conn is not None:
+            await self.conn.execute('EXEC')
+            self.conn.close()
+            await self.conn.wait_closed()
+            self.conn = None
+
     async def store_instance(self, instance):
         instance_id = instance['instance_id']
 
         for interface in instance.get('network_interfaces', []):
-            await self.store_interface(interface, KEY_I + instance_id, None)
+            await self.store_interface(interface, KEY_I + instance_id)
 
-        with await self.pool as conn:
-            redis = aioredis.Redis(conn)
+        redis = aioredis.Redis(self.conn)
 
-            # Store pickled instance data keyed off instance ID
-            await redis.set(key=KEY_I + instance_id, value=pickle.dumps(instance), expire=int(self.config.redis_ttl))
+        # Store pickled instance data keyed off instance ID
+        await redis.set(key=KEY_I + instance_id, value=pickle.dumps(instance, pickle.HIGHEST_PROTOCOL), expire=int(self.config.redis_ttl))
 
-    async def store_interface(self, interface, key=None, exist='SET_IF_NOT_EXIST'):
-        with await self.pool as conn:
-            redis = aioredis.Redis(conn)
-            interface_id = interface['network_interface_id']
+    async def store_interface(self, interface, key=None):
+        redis = aioredis.Redis(self.conn)
+        interface_id = interface['network_interface_id']
 
-            # Only store picked interface data if using default key (not fixed key from instance)
-            if not key:
-                key = KEY_ENI + interface_id
-                await redis.set(key=KEY_ENI + interface_id, value=pickle.dumps(interface), expire=int(self.config.redis_ttl))
+        # Only store picked interface data if using default key (not fixed key from instance)
+        if not key:
+            key = KEY_ENI + interface_id
+            await redis.set(key=KEY_ENI + interface_id, value=pickle.dumps(interface, pickle.HIGHEST_PROTOCOL), expire=int(self.config.redis_ttl))
 
-            # Store intermediate key lookups so that we can find metadata given only an IP address
-            if 'association' in interface:
-                await redis.set(key=KEY_IP + interface['association']['public_ip'], value=key, expire=int(self.config.redis_ttl), exist=exist)
+        # Store intermediate key lookups so that we can find metadata given only an IP address
+        if 'association' in interface:
+            await redis.set(key=KEY_IP + interface['association']['public_ip'], value=key, expire=int(self.config.redis_ttl))
 
-            for address in interface.get('private_ip_addresses', []):
-                await redis.set(key=KEY_IP + address['private_ip_address'], value=key, expire=int(self.config.redis_ttl), exist=exist)
+        for address in interface.get('private_ip_addresses', []):
+            await redis.set(key=KEY_IP + address['private_ip_address'], value=key, expire=int(self.config.redis_ttl))

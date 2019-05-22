@@ -8,7 +8,7 @@ import botocore
 import click
 
 from .config import Config, parse_file
-from .metadata import RedisMetadataStore
+from .metadata import RedisMetadataWriter
 
 _session_cache = {}
 logger = logging.getLogger(__name__)
@@ -116,16 +116,27 @@ async def store_aws_metadata(config):
     if 'all' in regions:
         regions = session.get_available_regions('ec2')
 
-    async with RedisMetadataStore(config) as metadata:
+    async with RedisMetadataWriter(config) as metadata:
         for region in regions:
             logger.info(f'Describing instances in {region}')
             try:
                 ec2_client = session.client('ec2', region)
             except Exception as e:
                 logger.error(f'Failed to create EC2 client: {e}')
-                return
+                continue
 
-            # Find all instances, convert to snake dict, convert to tags, store in redis
+            # Store raw interfaces first so that instance interfaces can overwrite the IP lookup
+            try:
+                for interfaces in ec2_client.get_paginator('describe_network_interfaces').paginate():
+                    for interface in interfaces.get('NetworkInterfaces', []):
+                        interface = camel_dict_to_snake_dict(interface)
+                        interface['tags'] = tag_list_to_dict(interface.pop('tag_set', []))
+                        logger.info(f'Storing data for {interface["network_interface_id"]}')
+                        await metadata.store_interface(interface)
+            except Exception as e:
+                logger.error(f'Failed to sync interface information: {e}')
+                continue
+
             try:
                 for instances in ec2_client.get_paginator('describe_instances').paginate():
                     for reservation in instances.get('Reservations', []):
@@ -136,18 +147,7 @@ async def store_aws_metadata(config):
                             await metadata.store_instance(instance)
             except Exception as e:
                 logger.error(f'Failed to sync instance information: {e}')
-                return
-
-            try:
-                for interfaces in ec2_client.get_paginator('describe_network_interfaces').paginate():
-                    for interface in interfaces.get('NetworkInterfaces', []):
-                        interface = camel_dict_to_snake_dict(interface)
-                        interface['tags'] = tag_list_to_dict(interface.pop('tag_set', []))
-                        logger.info(f'Storing data for {interface["network_interface_id"]}')
-                        await metadata.store_interface(interface)
-            except Exception as e:
-                logger.error(f'Failed to sync interface information: {e}')
-                return
+                continue
 
 
 @click.option(

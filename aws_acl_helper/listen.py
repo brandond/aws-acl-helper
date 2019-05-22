@@ -12,7 +12,7 @@ import click
 
 from . import aclmatch, squid
 from .config import Config
-from .metadata import RedisMetadataStore
+from .metadata import RedisMetadataReader
 
 reader, writer = None, None
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ async def async_input(config):
             logger.warn('aws-acl-helper did not detect squid socket, using stdio. See brandond/aws-acl-helper#2')
             reader, writer = await stdio()
 
-    async with RedisMetadataStore(config) as metadata:
+    async with RedisMetadataReader(config) as metadata:
         while True:
             line = await reader.readline()
             logger.debug(f'STDIN: {line}')
