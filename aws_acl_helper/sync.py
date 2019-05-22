@@ -127,24 +127,24 @@ async def store_aws_metadata(config):
 
             # Find all instances, convert to snake dict, convert to tags, store in redis
             try:
-                instances = ec2_client.describe_instances()
-                for reservation in instances.get('Reservations', []):
-                    for instance in reservation.get('Instances', []):
-                        instance = camel_dict_to_snake_dict(instance)
-                        instance['tags'] = tag_list_to_dict(instance.get('tags', []))
-                        logger.info(f'Storing data for {instance["instance_id"]}')
-                        await metadata.store_instance(instance)
+                for instances in ec2_client.get_paginator('describe_instances').paginate():
+                    for reservation in instances.get('Reservations', []):
+                        for instance in reservation.get('Instances', []):
+                            instance = camel_dict_to_snake_dict(instance)
+                            instance['tags'] = tag_list_to_dict(instance.get('tags', []))
+                            logger.info(f'Storing data for {instance["instance_id"]}')
+                            await metadata.store_instance(instance)
             except Exception as e:
                 logger.error(f'Failed to sync instance information: {e}')
                 return
 
             try:
-                interfaces = ec2_client.describe_network_interfaces()
-                for interface in interfaces.get('NetworkInterfaces', []):
-                    interface = camel_dict_to_snake_dict(interface)
-                    interface['tags'] = tag_list_to_dict(interface.pop('tag_set', []))
-                    logger.info(f'Storing data for {interface["network_interface_id"]}')
-                    await metadata.store_interface(interface)
+                for interfaces in ec2_client.get_paginator('describe_network_interfaces').paginate():
+                    for interface in interfaces.get('NetworkInterfaces', []):
+                        interface = camel_dict_to_snake_dict(interface)
+                        interface['tags'] = tag_list_to_dict(interface.pop('tag_set', []))
+                        logger.info(f'Storing data for {interface["network_interface_id"]}')
+                        await metadata.store_interface(interface)
             except Exception as e:
                 logger.error(f'Failed to sync interface information: {e}')
                 return
